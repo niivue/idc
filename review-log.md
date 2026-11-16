@@ -15,3 +15,8 @@ Anchor STANDARD pair: CT `…97114726565566537928831413367474015470` (129 inst, 
 
 Advice: I0 not at exit — WASM never run, representation not demonstrated (`selectedLabels` only dims, so isolate must use `hiddenLabels`), SEG metadata unrecorded; Q1/Q4/Q5 were unconfirmed; tell Chris about side effects; start slides feasibility early; set up the loop.
 Disposition: all done above. Chris confirmed Fable = advisor tool and Q4/Q5 defaults. Isolate implemented with `hiddenLabels`. Slides feasibility queued next.
+
+## Advisor (Fable) — I0 exit / first end-to-end, 2026-11-16
+
+Advice: I0 passes. Blocking I1: superseded overlay could install (no abort check after awaited nv calls; `shown` read mid-install); timings not split. Blocking I2: verify LUNG pair, one point per segment, reference/FoR validation owner. Non-blocking: regular-volume gate limitation, URL semantics into Decisions, abort siblings on fetch error, credit innerHTML.
+Disposition: race reproduced by e2e (FAIL on old code) and fixed by serialising loads; siblings aborted; credit uses DOM nodes; URL semantics recorded; others queued in Status.

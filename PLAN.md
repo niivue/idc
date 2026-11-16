@@ -13,6 +13,7 @@ Status: implementation authorized 2026-11-16 (loop). Canonical copy: this file. 
 | Q5 | Default: desktop Chrome/Safari first; sample CT + SEG is the benchmark; no 10 s gate. |
 | dcm2niix | Develop against a local WASM tarball built from dcm2niix `development` 67379e8 (`vendor/`, hash-pinned). Chris publishes an npm rc before release; switch to it then. |
 | Publish | Local commits only. Ask before any push/Pages deploy. |
+| URL (agent choice, revisit if wrong) | `SeriesInstanceUIDs` (alias `seriesInstanceUID`) names what is shown: a SEG brings its referenced base; a volume shows alone (no overlay). A study-only link autoloads and is rewritten to the chosen SEG UID so a copied link is explicit. |
 
 Carry forward the draft's architectural decisions: separate `niivue/idc` repository; static browser app with no application backend; S3 + IDC index first; dcm2niix for conversion, with no interim JavaScript SEG decoder; read-only viewing. Editing/export, RTSTRUCT, SR measurements and DICOMweb implementation remain outside this viewer's initial scope. Thumbnail generation is deferred until basic navigation works.
 
@@ -149,9 +150,9 @@ Evidence and adviser dispositions: `review-log.md`.
 
 | Slice | State |
 |---|---|
-| I0 | done locally (WASM in browser verified); adviser checkpoint 1 pending |
-| I1 | working: resolver, S3 fetch (8-way, abort, completeness), MPR+3D, DICOM window, selector with reasons, URL/back/forward, stale-load guard. Open: show alternatives when a series splits; restricted-bucket CORS. |
-| I2 | working on anchor: autoload, 74 named segments, toggle/isolate/show all, opacity, outline. Open: validate SEG references/FrameOfReference against the base (today: `seg_index` hint + patient-space placement); explicit failure UX for an unsupported SEG. |
+| I0 | done; adviser checkpoint 1 closed |
+| I1 | working: resolver, S3 fetch (8-way, abort, completeness), MPR+3D, DICOM window, selector with reasons, URL/back/forward, stale-load guard. Open: separate cold/warm network/conversion/render timings; show alternatives when a series splits; restricted-bucket CORS. Known limit: viewable volume requires `regularly_spaced_3d_volume = true`. |
+| I2 | working on anchor: autoload, 74 named segments, toggle/isolate/show all, opacity, outline. Open: validate SEG references/FrameOfReference against the base (today: `seg_index` hint + patient-space placement); explicit failure UX for an unsupported SEG; LUNG pair independent verification; one browser point per segment for both pairs. |
 | I3 | not started; feasibility next (release-blocking per Q2) |
 
 Checks: `bun test src` (selection, S3 pagination/completeness); `node e2e/live.mjs [url]` live smoke against IDC (dev server or built `dist/` under `/idc/`): autoload, label at 7 verified patient points, WASM label counts = native, isolate/show all, explicit CT alone, back/forward, superseded load, outline/opacity, no console errors. Cold anchor pair ≈15–20 s on this Mac.

@@ -60,12 +60,21 @@ async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{
   return { out, first: files[0] }
 }
 
-async function show(requested?: string) {
+let queue: Promise<void> = Promise.resolve()
+
+/** Supersede any running load, then load once it has unwound, so `shown` is never read mid-install. */
+function show(requested?: string): Promise<void> {
   active?.abort()
   const ac = new AbortController()
   active = ac
-  const { signal } = ac
   delete document.body.dataset.shown
+  queue = queue.then(() => load(requested, ac))
+  return queue
+}
+
+async function load(requested: string | undefined, ac: AbortController) {
+  const { signal } = ac
+  if (signal.aborted) return
   try {
     const sel = select(all, requested)
     if (shown?.base.uid !== sel.base.uid) {
@@ -76,10 +85,12 @@ async function show(requested?: string) {
       await nv.loadVolumes([vol])
       shown = { base: sel.base }
       segPanel.hidden = true
+      if (signal.aborted) return
     } else if (shown.seg && shown.seg.uid !== sel.seg?.uid) {
       await nv.removeVolume(1)
       shown = { base: sel.base }
       segPanel.hidden = true
+      if (signal.aborted) return
     }
     if (sel.seg && shown?.seg?.uid !== sel.seg.uid) {
       status('Image ready; loading segmentation…')
@@ -103,15 +114,17 @@ async function show(requested?: string) {
       })
       if (signal.aborted) return
       await nv.addVolume(vol)
+      shown = sel
       segments = segs
       hidden = new Set()
       renderSegments()
       segPanel.hidden = false
-      shown = sel
+      if (signal.aborted) return
     }
     status(shown?.seg ? `${segments.length} segments` : 'Ready')
   } catch (e) {
     if (signal.aborted) return
+    ac.abort() // stop this load's remaining downloads/workers
     status(`${(e as Error).message}${shown ? '\nShowing the previous selection.' : ''}`, true)
   }
   // Keep the URL and selector on what is actually shown.
@@ -124,10 +137,17 @@ function syncUi() {
   document.body.dataset.shown = uid // settled marker for e2e
   if (shown && new URLSearchParams(location.search).get('SeriesInstanceUIDs') !== uid)
     history.replaceState(null, '', urlFor(uid))
-  const credit = shown ? [shown.base, shown.seg].filter(Boolean) as Series[] : []
-  $('credit').innerHTML = credit
-    .map((s) => `${s.modality}: ${s.license}, <a href="https://doi.org/${s.doi}" target="_blank" rel="noopener">doi:${s.doi}</a>`)
-    .join('<br>')
+  const credit = shown ? ([shown.base, shown.seg].filter(Boolean) as Series[]) : []
+  $('credit').replaceChildren(
+    ...credit.flatMap((s) => {
+      const a = document.createElement('a')
+      a.href = `https://doi.org/${s.doi}`
+      a.target = '_blank'
+      a.rel = 'noopener'
+      a.textContent = `doi:${s.doi}`
+      return [`${s.modality}: ${s.license}, `, a, document.createElement('br')]
+    }),
+  )
 }
 
 function renderSegments() {

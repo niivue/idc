@@ -12,6 +12,7 @@ const segPanel = $('segments')
 const opacityEl = $<HTMLInputElement>('opacity')
 const outlineEl = $<HTMLInputElement>('outline')
 const cinematicEl = $<HTMLInputElement>('cinematic')
+const slidePathEl = $<HTMLSelectElement>('slidePath')
 
 // WebGPU (WebGL2 fallback): WebGL2 cinematic loses label materials when entered after volumes load (core bug, see PLAN.md).
 const hasWebGPU = !!(await (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter())
@@ -42,6 +43,7 @@ const slideCanvas = $<HTMLCanvasElement>('slide')
 
 function showCanvas(slide: boolean) {
   slideCanvas.hidden = !slide
+  if (!slide) slidePathEl.hidden = true
   glCanvas.hidden = slide
   if (!slide) slideView?.setSlide(null)
 }
@@ -52,17 +54,29 @@ async function loadSlide(s: Series, signal: AbortSignal) {
   const url = seriesUrl(study, s)
   const res = await fetch(`${url}/metadata`, { signal })
   if (!res.ok) throw new Error(`Slide metadata: HTTP ${res.status}`)
-  const index = indexDicomWsiMetadata(await res.json())
-  const first = index.slides[0]
-  if (!first) throw new Error('Slide: no tiled VOLUME images in this series')
-  const source = await DicomWebWsiSource.open(first, { seriesUrl: url }, signal)
-  if (signal.aborted) return source.dispose()
-  showCanvas(true)
-  slideView ??= await createSlideView(slideCanvas)
-  slideView.setSlide(NVSlide.fromSource(source))
+  const { slides } = indexDicomWsiMetadata(await res.json())
+  if (!slides.length) throw new Error('Slide: no tiled VOLUME images in this series')
+  // One slide per optical path and focal plane (nv-ext-tile): offer them all, show the first.
+  const open = async (i: number, sig: AbortSignal) => {
+    const source = await DicomWebWsiSource.open(slides[i], { seriesUrl: url }, sig)
+    if (sig.aborted) return source.dispose()
+    showCanvas(true)
+    slideView ??= await createSlideView(slideCanvas)
+    slideView.setSlide(NVSlide.fromSource(source))
+  }
+  await open(0, signal)
+  if (signal.aborted) return
+  slidePathEl.replaceChildren(
+    ...slides.map((x, i) => new Option(`${x.opticalPath}${x.zOffsetUm === undefined ? '' : ` z ${x.zOffsetUm} µm`}`, String(i))),
+  )
+  slidePathEl.hidden = slides.length < 2
+  slidePathEl.onchange = () => {
+    const ac = new AbortController() // ponytail: not queued with series loads; a series switch hides this control
+    open(Number(slidePathEl.value), ac.signal).catch((e) => status((e as Error).message, true))
+  }
   segPanel.hidden = true
   shown = { base: s }
-  status(index.slides.length > 1 ? `Slide 1 of ${index.slides.length} (optical paths/focal planes)` : 'Slide')
+  status(slides.length > 1 ? `Slide: ${slides.length} optical paths/focal planes` : 'Slide')
 }
 
 function status(msg: string, error = false) {

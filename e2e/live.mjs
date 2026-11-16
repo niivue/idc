@@ -105,5 +105,17 @@ await p2.goto(`${base}?StudyInstanceUIDs=${STUDY}&SeriesInstanceUIDs=${STD_SEG}`
 await p2.waitForFunction(() => document.body.dataset.shown, null, { timeout: 300000 })
 const refused = await p2.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join('|'))
 check(refused.startsWith(`${LUNG_CT}|1|Segmentation does not reference`), `mismatched SEG refused, CT kept (${refused.slice(0, 120)})`)
+// Other buckets (CORS + listing + conversion in a real browser): CC BY-NC (idc-open-data-cr) MR, idc-open-data-two CT.
+for (const [st, se, b] of [
+  ['1.3.6.1.4.1.14519.5.2.1.186051521067863971269584893740842397538', '1.3.6.1.4.1.14519.5.2.1.175414966301645518238419021688341658582', 'idc-open-data-cr'],
+  ['1.3.6.1.4.1.14519.5.2.1.7009.2403.150606740246630053720505955959', '1.3.6.1.4.1.14519.5.2.1.7009.2403.215404965552082304679349341030', 'idc-open-data-two'],
+]) {
+  const p3 = await browser.newPage()
+  await p3.goto(`${base}?StudyInstanceUIDs=${st}&SeriesInstanceUIDs=${se}`)
+  await p3.waitForFunction(() => document.body.dataset.shown || document.getElementById('status').classList.contains('error'), null, { timeout: 300000 })
+  const r = await p3.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent, document.getElementById('credit').textContent].join('|'))
+  check(r.startsWith(`${se}|1|Ready`), `${b}: ${r.split('|').slice(2).join(' | ')}`)
+  await p3.close()
+}
 await browser.close()
 process.exit(failed ? 1 : 0)

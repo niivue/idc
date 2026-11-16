@@ -36,5 +36,19 @@ check(frames > open.frames, 'zoom fetched more tiles')
 check(bytes < size / 8, `far less than the ${size / 1e6} MB series`)
 check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
 }
+// Multiplexed fluorescence (HTAN-OHSU, CC BY 4.0, JPEG 2000 lossless, series 2.1 GB): one slide per optical path; the picker switches channel.
+{
+  errors.length = 0
+  await page.goto(`${base}?StudyInstanceUIDs=2.25.56219147941526607962658668060030231728&SeriesInstanceUIDs=1.3.6.1.4.1.5962.99.1.2000002781.2080371485.1655562444509.4.0`)
+  await page.waitForFunction(() => document.body.dataset.shown, null, { timeout: 120000 })
+  const n = await page.locator('#slidePath option').count()
+  check(n > 1 && (await page.isVisible('#slidePath')), `optical-path picker lists ${n} slides: ${await page.textContent('#status')}`)
+  const before = frames
+  await page.selectOption('#slidePath', String(n - 1))
+  await page.waitForTimeout(4000)
+  check(frames > before, `switching path fetches its tiles (${frames - before} frames)`)
+  await page.screenshot({ path: `${process.env.SHOT ?? 'slide-shot'}-fluor.png` })
+  check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+}
 await browser.close()
 process.exit(failed ? 1 : 0)

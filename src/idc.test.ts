@@ -50,4 +50,9 @@ test('S3 listing follows continuation tokens; a short series is rejected', async
   const files = await fetchSeries(ct, new AbortController().signal, () => {})
   expect(files.map((f) => f.name)).toEqual(['a.dcm', 'b.dcm'])
   await expect(fetchSeries({ ...ct, instances: 3 }, new AbortController().signal, () => {})).rejects.toThrow('2 of 3')
+  // A failed instance GET rejects the series rather than converting a partial download.
+  const list = globalThis.fetch
+  globalThis.fetch = (async (url: string) =>
+    new URL(url).searchParams.has('list-type') ? list(url) : new Response('', { status: 503 })) as typeof fetch
+  await expect(fetchSeries(ct, new AbortController().signal, () => {})).rejects.toThrow('HTTP 503')
 })

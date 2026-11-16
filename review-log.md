@@ -35,3 +35,16 @@ dcm2niix: 74 segments, 2674 frames, 9,750,875 voxels, 0 overlapping. `verify_seg
 | warm | SEG | 138 | 1476 | 85 |
 
 Total to overlay: cold 9.9 s, warm 2.3 s (includes the IDC SQL query). Warm = browser HTTP cache (S3 sends ETag/Last-Modified). SEG conversion (1.5 s) is the warm bottleneck; Range-chunked SEG retrieval not justified yet.
+
+## Advisor (Fable) — release gate / I1–I2 exit, 2026-11-16
+
+Advice and disposition:
+1. Correctness suites never ran on WebGPU → `GPU=1` mode (headed Chrome, Metal) asserts `nv.backend === 'webgpu'`; offline/live/slide pass (35 checks).
+2. Built app under `/idc/` stale → `dist/` served at `/idc/`, all suites rerun: headless 31 ok, WebGPU 35 ok, WebKit 31 ok.
+3. Safari unverified → Playwright WebKit (`BROWSER=webkit`): offline/live/slide pass. Real Safari still a manual check.
+4. Fresh clone → `git clone` + `bun install --frozen-lockfile` + build + test pass. Two committed screenshots removed; `*.png` ignored.
+5. Unsupported SEG link showed nothing → base shown with "Segmentation not shown: <reason>"; unit test + live FRACTIONAL SEG (`…2311.230378240269972963231696070064`) pass.
+6. Cinematic black without WebGPU → checkbox disabled without a WebGPU adapter and for non-CT images.
+7. No README → added (URL recipe, object matrix, limits, rebuild commands, vendor sha256, release-order trap).
+8. No offline fixture → `tools/make_fixture.py` (synthetic 16×12×4 CT + 2-segment off-centre SEG, 28 KB) + `e2e/offline.mjs` (IDC/S3 routed to the fixture). It caught a real bug: a SEG without RecommendedDisplayCIELab crashed the overlay; now fallback colours.
+Housekeeping: failed-GET retrieval case added. Not done (recorded for Chris): WebGL2 bug repro not yet narrowed with example data on Metal; mono full CI not run.

@@ -1,7 +1,7 @@
 // Offline workflow (no IDC/S3 traffic; CI-able): IDC SQL and S3 are served from e2e/fixture.
 // node e2e/offline.mjs [baseUrl]   (fixture: tools/make_fixture.py)
 import { readdirSync, readFileSync } from 'node:fs'
-import { chromium } from 'playwright'
+import { gpu, launch } from './launch.mjs'
 
 const base = process.argv[2] ?? 'http://localhost:5299/'
 const dir = new URL('./fixture/', import.meta.url)
@@ -14,7 +14,7 @@ const row = (uid, modality, n, uuid, seg) => ({
 })
 const sql = { rows: [row(fx.ct, 'CT', 4, 'ct', false), row(fx.seg, 'SEG', 1, 'seg', true)], truncated: false }
 
-const browser = await chromium.launch()
+const browser = await launch()
 const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
@@ -31,8 +31,10 @@ await page.route('https://fixture.s3.us-east-1.amazonaws.com/**', (r) => {
 })
 let failed = 0
 const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
+const backendCheck = async (p) => gpu && check((await p.evaluate(() => nv.backend)) === 'webgpu', 'runs on WebGPU')
 await page.goto(`${base}?StudyInstanceUIDs=${fx.study}`)
 await page.waitForFunction(() => document.body.dataset.shown, null, { timeout: 60000 })
+await backendCheck(page)
 const st = await page.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join('|'))
 check(st.startsWith(`${fx.seg}|2`), `study link autoloads the SEG over its CT (${st})`)
 const labels = await page.evaluate((pts) => pts.map((p) => {

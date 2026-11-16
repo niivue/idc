@@ -1,6 +1,6 @@
 // Live smoke against IDC: node e2e/live.mjs [baseUrl]. Not for CI (hits public IDC/S3).
 import { readFileSync } from 'node:fs'
-import { chromium } from 'playwright'
+import { gpu, launch } from './launch.mjs'
 
 const base = process.argv[2] ?? 'http://localhost:5299/'
 const STUDY = '1.2.840.113654.2.55.187766322555605983451267194286230980878'
@@ -10,13 +10,14 @@ const LUNG_CT = '1.2.840.113654.2.55.122344168497038128022524906545138736420'
 // One point per segment (RAS mm) + label counts, from tools/seg_points.py on verify_seg.py-validated NIfTIs.
 const fixture = (n) => JSON.parse(readFileSync(new URL(`./${n}-points.json`, import.meta.url)))
 
-const browser = await chromium.launch()
+const browser = await launch()
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 let failed = 0
 const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
+const backendCheck = async (p) => gpu && check((await p.evaluate(() => nv.backend)) === 'webgpu', 'runs on WebGPU')
 const settled = (uid) => page.waitForFunction((u) => {
   const shown = document.body.dataset.shown
   return u ? shown === u : !!shown
@@ -45,6 +46,7 @@ async function checkSeg({ points, counts }, name) {
 let t = Date.now()
 await page.goto(`${base}?StudyInstanceUIDs=${STUDY}`)
 await settled()
+await backendCheck(page)
 check(seriesParam() === LUNG_SEG, `study-only autoloads LUNG SEG (${((Date.now() - t) / 1000).toFixed(1)}s)`)
 check((await page.evaluate(() => nv.isLegendVisible && nv.isLegendToggleEnabled && nv.volumes[1].colormapLabel.labels.filter(Boolean).length)) === 74, 'native legend with 74 named labels')
 await checkSeg(fixture('lung'), 'LUNG')

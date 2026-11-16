@@ -1,11 +1,11 @@
 // Live slide smoke (IDC DICOMweb proxy): node e2e/slide.mjs [baseUrl]. Not for CI.
-import { chromium } from 'playwright'
+import { gpu, launch } from './launch.mjs'
 
 const base = process.argv[2] ?? 'http://localhost:5299/'
 // CC BY 4.0 slides from two collections and codecs: CPTAC-LUAD JPEG baseline (series 162 MB),
 // CATCH JPEG 2000 (series 239 MB; needs dcm2niix decoders).
 const SLIDES = [['2.25.11321499043287739942958746184768363349', 162e6], ['2.25.19454760007169100657755148757857609085', 239e6]]
-const browser = await chromium.launch()
+const browser = await launch()
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
@@ -18,6 +18,7 @@ page.on('response', async (r) => {
 })
 let failed = 0
 const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
+const backendCheck = async (p) => gpu && check((await p.evaluate(() => nv.backend)) === 'webgpu', 'runs on WebGPU')
 for (const [STUDY, size] of SLIDES) {
 frames = 0; bytes = 0; metaBytes = 0; errors.length = 0
 const t = Date.now()
@@ -25,6 +26,7 @@ await page.goto(`${base}?StudyInstanceUIDs=${STUDY}`)
 await page.waitForFunction(() => document.body.dataset.shown, null, { timeout: 120000 })
 await page.waitForTimeout(3000)
 check(!(await page.locator('#slide').isHidden()), `slide canvas shown (${((Date.now() - t) / 1000).toFixed(1)}s): ${await page.textContent('#status')}`)
+await backendCheck(page)
 const open = { frames, bytes }
 const box = await page.locator('#slide').boundingBox()
 await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)

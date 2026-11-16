@@ -95,5 +95,19 @@ await page.waitForTimeout(500)
 check((await page.evaluate(() => [nv.volumes[1].atlasOutline, nv.volumes[1].opacity].join())) === '1,1', 'outline + opacity applied')
 await page.screenshot({ path: process.env.SHOT ?? 'e2e-shot.png' })
 check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+
+// Wrong index hint: the STANDARD SEG claims the LUNG CT (same grid size). The SEG's own
+// references must win: overlay refused, CT kept.
+const p2 = await browser.newPage()
+await p2.route('**/v3/sql', async (route) => {
+  const res = await route.fetch()
+  const body = await res.json()
+  for (const r of body.rows) if (r.SeriesInstanceUID === STD_SEG) r.segmented_SeriesInstanceUID = LUNG_CT
+  await route.fulfill({ response: res, json: body })
+})
+await p2.goto(`${base}?StudyInstanceUIDs=${STUDY}&SeriesInstanceUIDs=${STD_SEG}`)
+await p2.waitForFunction(() => document.body.dataset.shown, null, { timeout: 300000 })
+const refused = await p2.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join('|'))
+check(refused.startsWith(`${LUNG_CT}|1|Segmentation does not reference`), `mismatched SEG refused, CT kept (${refused.slice(0, 120)})`)
 await browser.close()
 process.exit(failed ? 1 : 0)

@@ -9,7 +9,7 @@
     "test": "bun test src"
   },
   "dependencies": {
-    "@niivue/dcm2niix": "file:./vendor/dcm2niix-67379e8.tgz",
+    "@niivue/dcm2niix": "file:./vendor/dcm2niix-6e8c84f.tgz",
     "@niivue/niivue": "1.0.0-rc.213",
     "@niivue/nv-ext-tile": "1.0.0-rc.122"
   },

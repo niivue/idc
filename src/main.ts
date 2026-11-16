@@ -23,6 +23,7 @@ Object.assign(globalThis, { nv }) // console/e2e handle
 let study = ''
 let all: Series[] = []
 let shown: Selection | undefined
+let baseFrameOfRef: unknown
 let segments: Segment[] = []
 let hidden = new Set<number>()
 let active: AbortController | undefined
@@ -82,7 +83,7 @@ function urlFor(series?: string): string {
 async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{ out: Converted; first: File }> {
   const files = await fetchSeries(s, signal, (d, t) => status(`${label}: downloading ${d}/${t}`))
   status(`${label}: converting`)
-  const { series, log } = await convert(files, { args: ['-z', 'n'], signal })
+  const { series, log } = await convert(files, { args: ['-z', 'n', '-ba', 'o'], signal })
   // ponytail: largest NIfTI wins when a series splits; list alternatives if real studies need them.
   const out = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)[0]
   if (!out) throw new Error(`${label}: dcm2niix produced no image\n${log.slice(-5).join('\n')}`)
@@ -122,6 +123,7 @@ async function load(requested: string | undefined, ac: AbortController) {
       if (signal.aborted) return
       await nv.loadVolumes([vol])
       shown = { base: sel.base }
+      baseFrameOfRef = out.json?.FrameOfReferenceUID
       segPanel.hidden = true
       if (signal.aborted) return
     } else if (shown.seg && shown.seg.uid !== sel.seg?.uid) {
@@ -135,6 +137,9 @@ async function load(requested: string | undefined, ac: AbortController) {
       const { out } = await toNifti(sel.seg, signal, 'Segmentation')
       const segs = (out.json?.Segments as Segment[] | undefined) ?? []
       if (!segs.length) throw new Error('Segmentation has no Segments table')
+      // The index's segmented_SeriesInstanceUID is a hint; the SEG object itself must agree.
+      if (out.json?.ReferencedSeriesInstanceUID !== sel.base.uid || out.json?.FrameOfReferenceUID !== baseFrameOfRef)
+        throw new Error('Segmentation does not reference the image shown (series or frame of reference differs)')
       const cmap = nv.addColormap(`seg-${sel.seg.uid}`, {
         R: [0, ...segs.map((s) => s.RGB[0])],
         G: [0, ...segs.map((s) => s.RGB[1])],

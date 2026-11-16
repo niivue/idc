@@ -20,3 +20,7 @@ Disposition: all done above. Chris confirmed Fable = advisor tool and Q4/Q5 defa
 
 Advice: I0 passes. Blocking I1: superseded overlay could install (no abort check after awaited nv calls; `shown` read mid-install); timings not split. Blocking I2: verify LUNG pair, one point per segment, reference/FoR validation owner. Non-blocking: regular-volume gate limitation, URL semantics into Decisions, abort siblings on fetch error, credit innerHTML.
 Disposition: race reproduced by e2e (FAIL on old code) and fixed by serialising loads; siblings aborted; credit uses DOM nodes; URL semantics recorded; others queued in Status.
+
+## LUNG pair (2026-11-16)
+
+dcm2niix: 74 segments, 2674 frames, 9,750,875 voxels, 0 overlapping. `verify_seg.py`: 0 mismatched. ReferencedSeriesSequence = LUNG CT; FoR equal. Browser: counts equal native; 74/74 per-segment points (`tools/seg_points.py`) correct for both pairs. Counts differ between pairs, so a pair swap fails the check.

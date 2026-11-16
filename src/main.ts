@@ -89,10 +89,26 @@ function urlFor(series?: string): string {
   return `?${q}`
 }
 
+// Stage timings (ms) of each install, for e2e/timing.mjs and the console.
+type Timing = { label: string; download: number; convert: number; render: number }
+const timings: Timing[] = []
+Object.assign(globalThis, { timings })
+let pending: Timing | undefined
+const frame = () => new Promise((r) => requestAnimationFrame(r))
+/** Close the timing of the install just made: time from conversion end to the next painted frame. */
+async function rendered(t0: number) {
+  await frame()
+  if (pending) timings.push({ ...pending, render: Math.round(performance.now() - t0) })
+  pending = undefined
+}
+
 async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{ out: Converted; first: File }> {
+  const t0 = performance.now()
   const files = await fetchSeries(s, signal, (d, t) => status(`${label}: downloading ${d}/${t}`))
+  const t1 = performance.now()
   status(`${label}: converting`)
   const { series, log } = await convert(files, { args: ['-z', 'n', '-ba', 'o'], signal })
+  pending = { label, download: Math.round(t1 - t0), convert: Math.round(performance.now() - t1), render: 0 }
   // ponytail: largest NIfTI wins when a series splits; list alternatives if real studies need them.
   const out = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)[0]
   if (!out) throw new Error(`${label}: dcm2niix produced no image\n${log.slice(-5).join('\n')}`)
@@ -128,9 +144,11 @@ async function load(requested: string | undefined, ac: AbortController) {
     if (shown?.base.uid !== sel.base.uid) {
       const { out, first } = await toNifti(sel.base, signal, 'Image')
       const win = dicomWindow(await first.slice(0, 65536).arrayBuffer())
+      const tr = performance.now()
       const vol = await nv.prepareVolume({ url: out.image, name: out.image.name, ...win })
       if (signal.aborted) return
       await nv.loadVolumes([vol])
+      await rendered(tr)
       baseWindow = { calMin: vol.calMin, calMax: vol.calMax }
       shown = { base: sel.base }
       baseFrameOfRef = out.json?.FrameOfReferenceUID
@@ -154,6 +172,7 @@ async function load(requested: string | undefined, ac: AbortController) {
       const cmap = nv.addColormap(`seg-${sel.seg.uid}`, maps.flat)
       const cmap3d = nv.addColormap(`seg-${sel.seg.uid}-3d`, maps.cinematic)
       materialsMatched = maps.matched
+      const tr = performance.now()
       const vol = await nv.prepareVolume({
         url: out.image,
         name: out.image.name,
@@ -163,6 +182,7 @@ async function load(requested: string | undefined, ac: AbortController) {
       })
       if (signal.aborted) return
       await nv.addVolume(vol)
+      await rendered(tr)
       flatCmap = cmap
       cinematicCmap = cmap3d
       shown = sel

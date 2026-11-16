@@ -24,3 +24,14 @@ Disposition: race reproduced by e2e (FAIL on old code) and fixed by serialising 
 ## LUNG pair (2026-11-16)
 
 dcm2niix: 74 segments, 2674 frames, 9,750,875 voxels, 0 overlapping. `verify_seg.py`: 0 mismatched. ReferencedSeriesSequence = LUNG CT; FoR equal. Browser: counts equal native; 74/74 per-segment points (`tools/seg_points.py`) correct for both pairs. Counts differ between pairs, so a pair swap fails the check.
+
+## Timings (2026-11-16, M4 Pro, headed Chrome/WebGPU, home network; `node e2e/timing.mjs`)
+
+| run | stage | download ms | convert ms | render ms |
+|---|---|---|---|---|
+| cold | CT (68 MB, 129 files) | 1933 | 119 | 199 |
+| cold | SEG (89 MB, 1 file) | 5575 | 1494 | 83 |
+| warm | CT | 129 | 86 | 179 |
+| warm | SEG | 138 | 1476 | 85 |
+
+Total to overlay: cold 9.9 s, warm 2.3 s (includes the IDC SQL query). Warm = browser HTTP cache (S3 sends ETag/Last-Modified). SEG conversion (1.5 s) is the warm bottleneck; Range-chunked SEG retrieval not justified yet.

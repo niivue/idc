@@ -1,0 +1,77 @@
+// Live smoke against IDC: node e2e/live.mjs [baseUrl]. Not for CI (hits public IDC/S3).
+import { readFileSync } from 'node:fs'
+import { chromium } from 'playwright'
+
+const base = process.argv[2] ?? 'http://localhost:5299/'
+const STUDY = '1.2.840.113654.2.55.187766322555605983451267194286230980878'
+const LUNG_SEG = '1.2.276.0.7230010.3.1.3.313263360.20363.1706320514.804396'
+const STD_SEG = '1.2.276.0.7230010.3.1.3.313263360.40027.1706310312.485948'
+const LUNG_CT = '1.2.840.113654.2.55.122344168497038128022524906545138736420'
+// Interior points of the STANDARD SEG (RAS mm), from tools/verify_seg.py-validated NIfTI.
+const { points, counts } = JSON.parse(readFileSync(new URL('./std-points.json', import.meta.url)))
+
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
+const errors = []
+page.on('pageerror', (e) => errors.push(e.message))
+page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+let failed = 0
+const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
+const settled = (uid) => page.waitForFunction((u) => {
+  const shown = document.body.dataset.shown
+  return u ? shown === u : !!shown
+}, uid, { timeout: 300000 })
+const seriesParam = () => new URL(page.url()).searchParams.get('SeriesInstanceUIDs')
+
+let t = Date.now()
+await page.goto(`${base}?StudyInstanceUIDs=${STUDY}`)
+await settled()
+check(seriesParam() === LUNG_SEG, `study-only autoloads LUNG SEG (${((Date.now() - t) / 1000).toFixed(1)}s)`)
+check(await page.locator('#segList li').count() === 74, '74 segment rows')
+
+t = Date.now()
+await page.selectOption('#series', STD_SEG)
+await settled(STD_SEG)
+check(seriesParam() === STD_SEG, `switch to STANDARD pair (${((Date.now() - t) / 1000).toFixed(1)}s)`)
+const got = await page.evaluate((pts) => pts.map((p) => {
+  let label
+  const on = (e) => { label = e.detail.values[1]?.label }
+  nv.addEventListener('locationChange', on)
+  nv.setCrosshairPos(p.mm)
+  nv.removeEventListener('locationChange', on)
+  return label
+}), points)
+const wasmCounts = await page.evaluate(() => {
+  const c = {}
+  for (const x of nv.volumes[1].img) c[x] = (c[x] ?? 0) + 1
+  return c
+})
+check(JSON.stringify(wasmCounts) === JSON.stringify(counts), 'WASM label counts equal native dcm2niix')
+points.forEach((p, i) => check(got[i] === p.label, `label at ${p.label}: ${got[i]}`))
+
+await page.click('#segList li:nth-child(4) .name') // isolate Liver
+check((await page.evaluate(() => nv.volumes[1].hiddenLabels.length)) === 73, 'isolate hides 73')
+await page.click('#showAll')
+check((await page.evaluate(() => nv.volumes[1].hiddenLabels.length)) === 0, 'show all')
+
+await page.selectOption('#series', LUNG_CT)
+await settled(LUNG_CT)
+check((await page.evaluate(() => nv.volumes.length)) === 1 && seriesParam() === LUNG_CT, 'explicit CT shows alone')
+await page.goBack()
+await settled(STD_SEG)
+check(seriesParam() === STD_SEG && (await page.evaluate(() => nv.volumes.length)) === 2, 'back restores STANDARD pair')
+// Rapid re-selection: only the latest selection may install.
+await page.selectOption('#series', LUNG_SEG)
+await page.selectOption('#series', STD_SEG)
+await settled(STD_SEG)
+await page.waitForTimeout(3000)
+const st = await page.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join())
+check(st.startsWith(`${STD_SEG},2`), `superseded load does not install (${st})`)
+await page.check('#outline')
+await page.fill('#opacity', '1')
+await page.waitForTimeout(500)
+check((await page.evaluate(() => [nv.volumes[1].atlasOutline, nv.volumes[1].opacity].join())) === '1,1', 'outline + opacity applied')
+await page.screenshot({ path: process.env.SHOT ?? 'e2e-shot.png' })
+check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+await browser.close()
+process.exit(failed ? 1 : 0)

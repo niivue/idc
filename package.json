@@ -1,0 +1,20 @@
+{
+  "name": "niivue-idc",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@niivue/dcm2niix": "file:./vendor/dcm2niix-67379e8.tgz",
+    "@niivue/niivue": "1.0.0-rc.211"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  }
+}

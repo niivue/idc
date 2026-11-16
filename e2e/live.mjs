@@ -105,6 +105,17 @@ await p2.goto(`${base}?StudyInstanceUIDs=${STUDY}&SeriesInstanceUIDs=${STD_SEG}`
 await p2.waitForFunction(() => document.body.dataset.shown, null, { timeout: 300000 })
 const refused = await p2.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join('|'))
 check(refused.startsWith(`${LUNG_CT}|1|Segmentation does not reference`), `mismatched SEG refused, CT kept (${refused.slice(0, 120)})`)
+// Explicit FRACTIONAL SEG link: the base still shows, with an explicit overlay refusal.
+{
+  const p4 = await browser.newPage()
+  const se = '1.3.6.1.4.1.14519.5.2.1.7695.2311.230378240269972963231696070064'
+  await p4.goto(`${base}?StudyInstanceUIDs=1.3.6.1.4.1.14519.5.2.1.7695.2311.106039727348255984980483774237&SeriesInstanceUIDs=${se}`)
+  await p4.waitForFunction(() => document.body.dataset.shown, null, { timeout: 300000 })
+  const r = await p4.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join('|'))
+  check(r === '1.3.6.1.4.1.14519.5.2.1.7695.2311.199207059153587286810160335300|1|Segmentation not shown: FRACTIONAL SEG not supported', `FRACTIONAL SEG link shows its base (${r.split('|')[2]})`)
+  await p4.close()
+}
+
 // Other buckets (CORS + listing + conversion in a real browser): CC BY-NC (idc-open-data-cr) MR, idc-open-data-two CT.
 for (const [st, se, b] of [
   ['1.3.6.1.4.1.14519.5.2.1.186051521067863971269584893740842397538', '1.3.6.1.4.1.14519.5.2.1.175414966301645518238419021688341658582', 'idc-open-data-cr'],

@@ -152,7 +152,10 @@ async function load(requested: string | undefined, ac: AbortController) {
     const sel = select(all, requested)
     if (sel.base.modality === 'SM') {
       if (shown?.base.uid !== sel.base.uid) await loadSlide(sel.base, signal)
-      if (!signal.aborted) syncUi()
+      if (!signal.aborted) {
+        gateCinematic()
+        syncUi()
+      }
       return
     }
     if (shown?.base.modality === 'SM') {
@@ -208,8 +211,10 @@ async function load(requested: string | undefined, ac: AbortController) {
       segPanel.hidden = false
       if (signal.aborted) return
     }
+    gateCinematic()
     setCinematic(cinematicEl.checked)
-    status((shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready') + splitNote)
+    if (sel.refused) status(sel.refused + splitNote, true)
+    else status((shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready') + splitNote)
   } catch (e) {
     if (signal.aborted) return
     ac.abort() // stop this load's remaining downloads/workers
@@ -252,6 +257,17 @@ function setCinematic(on: boolean) {
   } else nv.volumeCinematic = { labelMode: 'unlabeled' } // CT alone: the transfer function shows everything
 }
 cinematicEl.onchange = () => setCinematic(cinematicEl.checked)
+// The transfer function is in Hounsfield units, and WebGL2 cinematic loses label materials (see PLAN.md).
+function gateCinematic() {
+  const ok = hasWebGPU && shown?.base.modality === 'CT'
+  if (!ok && cinematicEl.checked) {
+    cinematicEl.checked = false
+    setCinematic(false)
+  }
+  cinematicEl.disabled = !ok
+  cinematicEl.parentElement!.title = ok ? '' : hasWebGPU ? 'CT only' : 'Needs WebGPU'
+}
+gateCinematic()
 opacityEl.oninput = () => nv.volumes.length > 1 && nv.setVolume(1, { opacity: Number(opacityEl.value) })
 outlineEl.onchange = () => nv.volumes.length > 1 && nv.setVolume(1, { atlasOutline: outlineEl.checked ? 1 : 0 })
 

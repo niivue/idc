@@ -20,7 +20,8 @@ export type Series = {
   regular: boolean | null
 }
 
-export type Selection = { base: Series; seg?: Series }
+/** `refused`: why a requested overlay is not shown while its base still is. */
+export type Selection = { base: Series; seg?: Series; refused?: string }
 
 export function isUid(s: string): boolean {
   return s.length <= 64 && UID.test(s)
@@ -84,6 +85,9 @@ export function select(all: Series[], requested?: string): Selection {
     const s = all.find((x) => x.uid === requested)
     if (!s) throw new Error(`Series ${requested} is not in this study`)
     const why = unsupported(s, all)
+    const base = all.find((b) => b.uid === s.segmentedUid)
+    // An unsupported SEG still shows the image it segments, with the reason.
+    if (why && s.modality === 'SEG' && base && !unsupported(base, all)) return { base, refused: `Segmentation not shown: ${why}` }
     if (why) throw new Error(`Series ${requested}: ${why}`)
     if (s.modality !== 'SEG') return { base: s }
     return { base: all.find((b) => b.uid === s.segmentedUid) as Series, seg: s }

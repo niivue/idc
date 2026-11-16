@@ -13,6 +13,7 @@ const study = [
   s('2.9', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '1.9' }),
   s('2.3', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '1.3' }),
   s('2.1', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '9.9' }),
+  s('2.7', { modality: 'SEG', instances: 1, segType: 'FRACTIONAL', segmentedUid: '1.9' }),
   s('3.1', { modality: 'SR', instances: 1, regular: null }),
 ]
 
@@ -31,6 +32,8 @@ test('missing or unviewable requested series is reported, not replaced', () => {
   expect(() => select(study, '7.7')).toThrow('not in this study')
   expect(() => select(study, '2.1')).toThrow('referenced series not in study')
   expect(() => select(study, '1.5')).toThrow('not a regular 3D volume')
+  // Unsupported SEG type: its base still shows, with the reason.
+  expect(select(study, '2.7')).toEqual({ base: study[0], refused: 'Segmentation not shown: FRACTIONAL SEG not supported' })
 })
 
 test('S3 listing follows continuation tokens; a short series is rejected', async () => {

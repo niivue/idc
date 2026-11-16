@@ -1,9 +1,9 @@
 import { convert, type Series as Converted } from '@niivue/dcm2niix'
-import NiiVue, { createSlideView, NVSlide, SHOW_RENDER, SLICE_TYPE, type SlideView } from '@niivue/niivue'
+import NiiVue, { createSlideView, lookupColorMap, NVSlide, SHOW_RENDER, SLICE_TYPE, type SlideView, VOLUME_RENDER_MODE } from '@niivue/niivue'
 import { DicomWebWsiSource, indexDicomWsiMetadata } from '@niivue/nv-ext-tile/dicom'
+import ctCinematic from './ct_cinematic.json'
 import { dicomWindow, fetchSeries, isUid, type Selection, type Series, select, seriesUrl, studySeries, unsupported } from './idc'
-
-type Segment = { LabelValue: number; SegmentNumber: number; SegmentLabel: string; RGB: [number, number, number] }
+import { type Segment, segColormaps } from './seg'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const statusEl = $('status')
@@ -11,20 +11,29 @@ const seriesEl = $<HTMLSelectElement>('series')
 const segPanel = $('segments')
 const opacityEl = $<HTMLInputElement>('opacity')
 const outlineEl = $<HTMLInputElement>('outline')
+const cinematicEl = $<HTMLInputElement>('cinematic')
 
-const nv = new NiiVue({ backgroundColor: [0, 0, 0, 1] })
+// WebGPU (WebGL2 fallback): WebGL2 cinematic loses label materials when entered after volumes load (core bug, see PLAN.md).
+const hasWebGPU = !!(await (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter())
+const nv = new NiiVue({ backend: hasWebGPU ? 'webgpu' : 'webgl2', backgroundColor: [0, 0, 0, 1] })
 await nv.attachToCanvas($<HTMLCanvasElement>('gl'))
 nv.sliceType = SLICE_TYPE.MULTIPLANAR
 nv.showRender = SHOW_RENDER.ALWAYS
 // Native legend: click a colour box to hide/show, double-click to show only it (again: all); name moves the crosshair.
 nv.isLegendToggleEnabled = true
 Object.assign(globalThis, { nv }) // console/e2e handle
+nv.addColormap('ct_cinematic', ctCinematic) // CT transfer function from NiiVue's cinematic example
+nv.volumeCinematic = { ao: 0.9, aoRadiusMM: 20 } // settings suggested by the TotalSegmentator table
+let flatCmap = ''
+let cinematicCmap = ''
+let baseWindow: { calMin: number; calMax: number } | undefined
 
 let study = ''
 let all: Series[] = []
 let shown: Selection | undefined
 let baseFrameOfRef: unknown
 let segments: Segment[] = []
+let materialsMatched = 0
 let active: AbortController | undefined
 let slideView: SlideView | undefined
 const glCanvas = $<HTMLCanvasElement>('gl')
@@ -121,6 +130,7 @@ async function load(requested: string | undefined, ac: AbortController) {
       const vol = await nv.prepareVolume({ url: out.image, name: out.image.name, ...win })
       if (signal.aborted) return
       await nv.loadVolumes([vol])
+      baseWindow = { calMin: vol.calMin, calMax: vol.calMax }
       shown = { base: sel.base }
       baseFrameOfRef = out.json?.FrameOfReferenceUID
       segPanel.hidden = true
@@ -139,14 +149,10 @@ async function load(requested: string | undefined, ac: AbortController) {
       // The index's segmented_SeriesInstanceUID is a hint; the SEG object itself must agree.
       if (out.json?.ReferencedSeriesInstanceUID !== sel.base.uid || out.json?.FrameOfReferenceUID !== baseFrameOfRef)
         throw new Error('Segmentation does not reference the image shown (series or frame of reference differs)')
-      const cmap = nv.addColormap(`seg-${sel.seg.uid}`, {
-        R: [0, ...segs.map((s) => s.RGB[0])],
-        G: [0, ...segs.map((s) => s.RGB[1])],
-        B: [0, ...segs.map((s) => s.RGB[2])],
-        A: [0, ...segs.map(() => 255)],
-        I: [0, ...segs.map((s) => s.LabelValue)],
-        labels: ['', ...segs.map((s) => s.SegmentLabel)],
-      })
+      const maps = segColormaps(segs, lookupColorMap('totalsegmentator'))
+      const cmap = nv.addColormap(`seg-${sel.seg.uid}`, maps.flat)
+      const cmap3d = nv.addColormap(`seg-${sel.seg.uid}-3d`, maps.cinematic)
+      materialsMatched = maps.matched
       const vol = await nv.prepareVolume({
         url: out.image,
         name: out.image.name,
@@ -156,12 +162,15 @@ async function load(requested: string | undefined, ac: AbortController) {
       })
       if (signal.aborted) return
       await nv.addVolume(vol)
+      flatCmap = cmap
+      cinematicCmap = cmap3d
       shown = sel
       segments = segs
       segPanel.hidden = false
       if (signal.aborted) return
     }
-    status(shown?.seg ? `${segments.length} segments` : 'Ready')
+    setCinematic(cinematicEl.checked)
+    status(shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready')
   } catch (e) {
     if (signal.aborted) return
     ac.abort() // stop this load's remaining downloads/workers
@@ -190,6 +199,20 @@ function syncUi() {
   )
 }
 
+/** Cinematic: full-canvas path-traced render with per-segment materials; off: MPR + 3D. */
+function setCinematic(on: boolean) {
+  const hasSeg = nv.volumes.length > 1
+  nv.volumeRenderMode = on ? VOLUME_RENDER_MODE.CINEMATIC : VOLUME_RENDER_MODE.COMPOSITE
+  nv.sliceType = on ? SLICE_TYPE.RENDER : SLICE_TYPE.MULTIPLANAR
+  if (!nv.volumes.length) return
+  // The base colormap is the transfer function in cinematic mode; 2D slices keep grey + DICOM window.
+  nv.setVolume(0, on ? { colormap: 'ct_cinematic', calMin: ctCinematic.min, calMax: ctCinematic.max } : { colormap: 'gray', ...baseWindow })
+  if (hasSeg) {
+    nv.setVolume(1, { colormap: on ? cinematicCmap : flatCmap })
+    nv.volumeCinematic = { labelMode: 'only' }
+  } else nv.volumeCinematic = { labelMode: 'unlabeled' } // CT alone: the transfer function shows everything
+}
+cinematicEl.onchange = () => setCinematic(cinematicEl.checked)
 opacityEl.oninput = () => nv.volumes.length > 1 && nv.setVolume(1, { opacity: Number(opacityEl.value) })
 outlineEl.onchange = () => nv.volumes.length > 1 && nv.setVolume(1, { atlasOutline: outlineEl.checked ? 1 : 0 })
 

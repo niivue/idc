@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@niivue/dcm2niix": "file:./vendor/dcm2niix-6e8c84f.tgz",
-    "@niivue/niivue": "1.0.0-rc.213",
+    "@niivue/niivue": "file:./vendor/niivue-c9f52e55.tgz",
     "@niivue/nv-ext-tile": "1.0.0-rc.122"
   },
   "devDependencies": {

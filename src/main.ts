@@ -1,6 +1,6 @@
 import { convert, type Series as Converted } from '@niivue/dcm2niix'
 import NiiVue, { createSlideView, lookupColorMap, NVSlide, SHOW_RENDER, SLICE_TYPE, type SlideView, VOLUME_RENDER_MODE } from '@niivue/niivue'
-import { DicomWebWsiSource, indexDicomWsiMetadata } from '@niivue/nv-ext-tile/dicom'
+import { DicomWebWsiSource, indexDicomWsiMetadata, registerDcm2niixDecoders } from '@niivue/nv-ext-tile/dicom'
 import ctCinematic from './ct_cinematic.json'
 import { dicomWindow, fetchSeries, isUid, type Selection, type Series, select, seriesUrl, studySeries, unsupported } from './idc'
 import { type Segment, segColormaps } from './seg'
@@ -22,6 +22,7 @@ nv.showRender = SHOW_RENDER.ALWAYS
 // Native legend: click a colour box to hide/show, double-click to show only it (again: all); name moves the crosshair.
 nv.isLegendToggleEnabled = true
 Object.assign(globalThis, { nv }) // console/e2e handle
+registerDcm2niixDecoders() // JPEG 2000 / JPEG-LS slide tiles and ICC colour; workers load on first use
 nv.addColormap('ct_cinematic', ctCinematic) // CT transfer function from NiiVue's cinematic example
 nv.volumeCinematic = { ao: 0.9, aoRadiusMM: 20 } // settings suggested by the TotalSegmentator table
 let flatCmap = ''

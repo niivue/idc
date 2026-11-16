@@ -36,6 +36,7 @@ let shown: Selection | undefined
 let baseFrameOfRef: unknown
 let segments: Segment[] = []
 let materialsMatched = 0
+let splitNote = ''
 let active: AbortController | undefined
 let slideView: SlideView | undefined
 const glCanvas = $<HTMLCanvasElement>('gl')
@@ -123,9 +124,11 @@ async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{
   status(`${label}: converting`)
   const { series, log } = await convert(files, { args: ['-z', 'n', '-ba', 'o'], signal })
   pending = { label, download: Math.round(t1 - t0), convert: Math.round(performance.now() - t1), render: 0 }
-  // ponytail: largest NIfTI wins when a series splits; list alternatives if real studies need them.
-  const out = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)[0]
+  // ponytail: largest NIfTI wins when a series splits (named in the status); add a picker when a real study needs one.
+  const outs = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)
+  const out = outs[0]
   if (!out) throw new Error(`${label}: dcm2niix produced no image\n${log.slice(-5).join('\n')}`)
+  splitNote = outs.length > 1 ? `\n${label}: series split into ${outs.length} outputs; showing ${out.stem}` : ''
   return { out, first: files[0] }
 }
 
@@ -205,7 +208,7 @@ async function load(requested: string | undefined, ac: AbortController) {
       if (signal.aborted) return
     }
     setCinematic(cinematicEl.checked)
-    status(shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready')
+    status((shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready') + splitNote)
   } catch (e) {
     if (signal.aborted) return
     ac.abort() // stop this load's remaining downloads/workers

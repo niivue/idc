@@ -1,6 +1,7 @@
 import { convert, type Series as Converted } from '@niivue/dcm2niix'
-import NiiVue, { SHOW_RENDER, SLICE_TYPE } from '@niivue/niivue'
-import { dicomWindow, fetchSeries, isUid, type Selection, type Series, select, studySeries, unsupported } from './idc'
+import NiiVue, { createSlideView, NVSlide, SHOW_RENDER, SLICE_TYPE, type SlideView } from '@niivue/niivue'
+import { DicomWebWsiSource, indexDicomWsiMetadata } from '@niivue/nv-ext-tile/dicom'
+import { dicomWindow, fetchSeries, isUid, type Selection, type Series, select, seriesUrl, studySeries, unsupported } from './idc'
 
 type Segment = { LabelValue: number; SegmentNumber: number; SegmentLabel: string; RGB: [number, number, number] }
 
@@ -25,6 +26,34 @@ let shown: Selection | undefined
 let segments: Segment[] = []
 let hidden = new Set<number>()
 let active: AbortController | undefined
+let slideView: SlideView | undefined
+const glCanvas = $<HTMLCanvasElement>('gl')
+const slideCanvas = $<HTMLCanvasElement>('slide')
+
+function showCanvas(slide: boolean) {
+  slideCanvas.hidden = !slide
+  glCanvas.hidden = slide
+  if (!slide) slideView?.setSlide(null)
+}
+
+/** Open the first optical path / focal plane of an SM series over WADO-RS. */
+async function loadSlide(s: Series, signal: AbortSignal) {
+  status('Slide: reading metadata')
+  const url = seriesUrl(study, s)
+  const res = await fetch(`${url}/metadata`, { signal })
+  if (!res.ok) throw new Error(`Slide metadata: HTTP ${res.status}`)
+  const index = indexDicomWsiMetadata(await res.json())
+  const first = index.slides[0]
+  if (!first) throw new Error('Slide: no tiled VOLUME images in this series')
+  const source = await DicomWebWsiSource.open(first, { seriesUrl: url }, signal)
+  if (signal.aborted) return source.dispose()
+  showCanvas(true)
+  slideView ??= await createSlideView(slideCanvas)
+  slideView.setSlide(NVSlide.fromSource(source))
+  segPanel.hidden = true
+  shown = { base: s }
+  status(index.slides.length > 1 ? `Slide 1 of ${index.slides.length} (optical paths/focal planes)` : 'Slide')
+}
 
 function status(msg: string, error = false) {
   statusEl.textContent = msg
@@ -77,6 +106,15 @@ async function load(requested: string | undefined, ac: AbortController) {
   if (signal.aborted) return
   try {
     const sel = select(all, requested)
+    if (sel.base.modality === 'SM') {
+      if (shown?.base.uid !== sel.base.uid) await loadSlide(sel.base, signal)
+      if (!signal.aborted) syncUi()
+      return
+    }
+    if (shown?.base.modality === 'SM') {
+      shown = undefined
+      showCanvas(false)
+    }
     if (shown?.base.uid !== sel.base.uid) {
       const { out, first } = await toNifti(sel.base, signal, 'Image')
       const win = dicomWindow(await first.slice(0, 65536).arrayBuffer())

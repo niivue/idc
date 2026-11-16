@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@niivue/dcm2niix": "file:./vendor/dcm2niix-67379e8.tgz",
-    "@niivue/niivue": "1.0.0-rc.211"
+    "@niivue/niivue": "1.0.0-rc.213",
+    "@niivue/nv-ext-tile": "1.0.0-rc.122"
   },
   "devDependencies": {
     "playwright": "1.64.1",

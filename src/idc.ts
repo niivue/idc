@@ -1,6 +1,8 @@
 // IDC resolution and retrieval: v3 SQL index + public S3. No app state here.
 
 const SQL_URL = 'https://api.imaging.datacommons.cancer.gov/v3/sql'
+// Slides only: S3 SM objects have no frame offsets (empty BOT, no EOT), so tiles come by WADO-RS (Chris, 2026-11-16).
+const DICOMWEB = 'https://proxy.imaging.datacommons.cancer.gov/current/viewer-only-no-downloads-see-tinyurl-dot-com-slash-3j3d9jyp/dicomWeb'
 const UID = /^[0-9]+(\.[0-9]+)*$/
 
 export type Series = {
@@ -65,7 +67,7 @@ export function unsupported(s: Series, all: Series[]): string | undefined {
     if (!base) return 'referenced series not in study'
     return unsupported(base, all) && 'referenced series not viewable'
   }
-  if (s.modality === 'SM') return 'slide microscopy not yet supported'
+  if (s.modality === 'SM') return undefined
   if (s.regular !== true) return 'not a regular 3D volume'
   return undefined
 }
@@ -94,6 +96,8 @@ export function select(all: Series[], requested?: string): Selection {
   if (!base) throw new Error('No viewable series in this study')
   return { base }
 }
+
+export const seriesUrl = (study: string, s: Series) => `${DICOMWEB}/studies/${study}/series/${s.uid}`
 
 const s3 = (s: Series) => `https://${s.bucket}.s3.us-east-1.amazonaws.com`
 

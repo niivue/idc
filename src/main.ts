@@ -128,7 +128,7 @@ async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{
   const outs = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)
   const out = outs[0]
   if (!out) throw new Error(`${label}: dcm2niix produced no image\n${log.slice(-5).join('\n')}`)
-  splitNote = outs.length > 1 ? `\n${label}: series split into ${outs.length} outputs; showing ${out.stem}` : ''
+  if (outs.length > 1) splitNote += `\n${label}: series split into ${outs.length} outputs; showing ${out.stem}`
   return { out, first: files[0] }
 }
 
@@ -147,6 +147,7 @@ function show(requested?: string): Promise<void> {
 async function load(requested: string | undefined, ac: AbortController) {
   const { signal } = ac
   if (signal.aborted) return
+  splitNote = ''
   try {
     const sel = select(all, requested)
     if (sel.base.modality === 'SM') {

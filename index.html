@@ -16,10 +16,6 @@
       select, button { width: 100%; font: inherit; }
       #status { color: var(--muted); white-space: pre-wrap; }
       #status.error { color: #d33; }
-      #segments ul { list-style: none; margin: 0; padding: 0; }
-      #segments li { display: flex; align-items: center; gap: 4px; }
-      #segments li span.name { cursor: pointer; flex: 1; }
-      .swatch { width: 12px; height: 12px; border-radius: 2px; flex: none; }
       .row { display: flex; gap: 6px; align-items: center; }
       #credit { color: var(--muted); font-size: 11px; }
       @media (max-width: 700px) { body { grid-template-columns: 1fr; grid-template-rows: auto 60vh; } aside { max-height: 40vh; } }
@@ -32,9 +28,7 @@
       <div id="segments" hidden>
         <div class="row"><label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
           <label><input id="outline" type="checkbox" /> Outline</label></div>
-        <div class="row"><button id="showAll">Show all</button></div>
-        <small>Click a name to isolate it; the box toggles it.</small>
-        <ul id="segList"></ul>
+        <small>Legend: click a colour box to hide/show it, double-click to show only it (again: all).</small>
       </div>
       <div id="credit"></div>
     </aside>

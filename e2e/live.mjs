@@ -46,7 +46,7 @@ let t = Date.now()
 await page.goto(`${base}?StudyInstanceUIDs=${STUDY}`)
 await settled()
 check(seriesParam() === LUNG_SEG, `study-only autoloads LUNG SEG (${((Date.now() - t) / 1000).toFixed(1)}s)`)
-check(await page.locator('#segList li').count() === 74, '74 segment rows')
+check((await page.evaluate(() => nv.isLegendVisible && nv.isLegendToggleEnabled && nv.volumes[1].colormapLabel.labels.filter(Boolean).length)) === 74, 'native legend with 74 named labels')
 await checkSeg(fixture('lung'), 'LUNG')
 
 t = Date.now()
@@ -55,10 +55,6 @@ await settled(STD_SEG)
 check(seriesParam() === STD_SEG, `switch to STANDARD pair (${((Date.now() - t) / 1000).toFixed(1)}s)`)
 await checkSeg(fixture('std'), 'STANDARD')
 
-await page.click('#segList li:nth-child(4) .name') // isolate Liver
-check((await page.evaluate(() => nv.volumes[1].hiddenLabels.length)) === 73, 'isolate hides 73')
-await page.click('#showAll')
-check((await page.evaluate(() => nv.volumes[1].hiddenLabels.length)) === 0, 'show all')
 
 await page.selectOption('#series', LUNG_CT)
 await settled(LUNG_CT)

@@ -9,7 +9,6 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const statusEl = $('status')
 const seriesEl = $<HTMLSelectElement>('series')
 const segPanel = $('segments')
-const segList = $('segList')
 const opacityEl = $<HTMLInputElement>('opacity')
 const outlineEl = $<HTMLInputElement>('outline')
 
@@ -17,7 +16,8 @@ const nv = new NiiVue({ backgroundColor: [0, 0, 0, 1] })
 await nv.attachToCanvas($<HTMLCanvasElement>('gl'))
 nv.sliceType = SLICE_TYPE.MULTIPLANAR
 nv.showRender = SHOW_RENDER.ALWAYS
-nv.isLegendVisible = false // the HTML list is the legend
+// Native legend: click a colour box to hide/show, double-click to show only it (again: all); name moves the crosshair.
+nv.isLegendToggleEnabled = true
 Object.assign(globalThis, { nv }) // console/e2e handle
 
 let study = ''
@@ -25,7 +25,6 @@ let all: Series[] = []
 let shown: Selection | undefined
 let baseFrameOfRef: unknown
 let segments: Segment[] = []
-let hidden = new Set<number>()
 let active: AbortController | undefined
 let slideView: SlideView | undefined
 const glCanvas = $<HTMLCanvasElement>('gl')
@@ -159,8 +158,6 @@ async function load(requested: string | undefined, ac: AbortController) {
       await nv.addVolume(vol)
       shown = sel
       segments = segs
-      hidden = new Set()
-      renderSegments()
       segPanel.hidden = false
       if (signal.aborted) return
     }
@@ -193,40 +190,6 @@ function syncUi() {
   )
 }
 
-function renderSegments() {
-  segList.replaceChildren(
-    ...segments.map((s) => {
-      const li = document.createElement('li')
-      const box = document.createElement('input')
-      box.type = 'checkbox'
-      box.checked = !hidden.has(s.LabelValue)
-      box.onchange = () => {
-        box.checked ? hidden.delete(s.LabelValue) : hidden.add(s.LabelValue)
-        applyHidden()
-      }
-      const sw = document.createElement('span')
-      sw.className = 'swatch'
-      sw.style.background = `rgb(${s.RGB.join(',')})`
-      const name = document.createElement('span')
-      name.className = 'name'
-      name.textContent = s.SegmentLabel
-      name.onclick = () => {
-        hidden = new Set(segments.map((x) => x.LabelValue).filter((v) => v !== s.LabelValue))
-        renderSegments()
-        applyHidden()
-      }
-      li.append(box, sw, name)
-      return li
-    }),
-  )
-}
-
-const applyHidden = () => nv.setVolume(1, { hiddenLabels: [...hidden] })
-$('showAll').onclick = () => {
-  hidden = new Set()
-  renderSegments()
-  applyHidden()
-}
 opacityEl.oninput = () => nv.volumes.length > 1 && nv.setVolume(1, { opacity: Number(opacityEl.value) })
 outlineEl.onchange = () => nv.volumes.length > 1 && nv.setVolume(1, { atlasOutline: outlineEl.checked ? 1 : 0 })
 

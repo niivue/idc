@@ -2,6 +2,8 @@
 
 > Paused (2026-11-17): IDC support continues in `@niivue/nv-ohif` (OHIF). This repo is kept as a reference and test oracle.
 
+Live: https://niivue.github.io/idc/ (e.g. [CT + TotalSegmentator SEG](https://niivue.github.io/idc/?StudyInstanceUIDs=1.2.840.113654.2.55.187766322555605983451267194286230980878)).
+
 Static, read-only viewer for [Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov/) studies: CT/MR volumes with named DICOM SEG overlays, and slide microscopy. No backend: the browser queries the IDC v3 SQL API, fetches public S3 objects (volumes, SEG) or IDC's DICOMweb proxy (slides), and converts DICOM with [dcm2niix](https://github.com/rordenlab/dcm2niix) (WebAssembly). Rendering: [NiiVue](https://github.com/niivue/niivue).
 
 ## Links
@@ -11,7 +13,7 @@ Static, read-only viewer for [Imaging Data Commons](https://portal.imaging.datac
 ?StudyInstanceUIDs=<study>&SeriesInstanceUIDs=<series>      that series (a SEG brings its image)
 ```
 
-`seriesInstanceUID` is accepted as an alias. One study and one series per link. An agent that found a UID through IDC discovery (MCP, idc-index, SQL) can build this link directly.
+`seriesInstanceUID` is accepted as an alias. One study and one series per link. An agent that found a UID through IDC discovery can build this link directly. See IDC's [AI assistants and agents](https://learn.canceridc.dev/ai-assistants/agents) guide for its MCP server (`https://api.imaging.datacommons.cancer.gov/mcp`), agent skill, idc-index and the v3 REST/SQL API.
 
 ## What is shown
 

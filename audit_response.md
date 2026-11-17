@@ -38,3 +38,9 @@ Declined: dropping the post-install abort check entirely (needed: no await follo
 
 - **No findings in the reviewed commit: agreed** (documentation only; the WebKit total of 5 + 15 + 11 = 31 checks matches the harness).
 - **Linked dcm2niix findings (multiple SEG references; implicit-VR cross-study references): fixed** on dcm2niix `idc/seg-refs` 8315639 (see `../dcm2niix/audit_response.md`). `ReferencedSeriesInstanceUID` is now an array, and `src/main.ts` requires that the shown image's series be a member and that the FrameOfReferenceUID match. Vendored `vendor/dcm2niix-8315639.tgz`. Offline (5) and live (16) suites pass, as do `bun test src` and the build.
+
+# Response: audit_temp.md (67a70d5, 2026-11-17, final round)
+
+- **No findings: agreed.** The auditor's extra fixture (an implicit-VR cross-study SEG with an unrelated UID first, the CT second and a duplicate) passing through the shipped WASM confirms the array-membership consumer end to end.
+- **Reference-list capacity (256 bytes, at least three 64-char UIDs; extras warn and are omitted): accepted, documented.** Raising it enlarges every `TDICOMdata` (dcm2niix keeps one per input file), and no IDC SEG with more than one source series is known. Revisit if one appears.
+- **Development of this app is paused** in favour of IDC support in nv-ohif (see PLAN.md Status and `~/src/mono/scratch/plan-idc-ohif.md`).

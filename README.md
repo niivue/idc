@@ -1,5 +1,7 @@
 # NiiVue IDC viewer
 
+> Paused (2026-11-17): IDC support continues in `@niivue/nv-ohif` (OHIF). This repo is kept as a reference and test oracle.
+
 Static, read-only viewer for [Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov/) studies: CT/MR volumes with named DICOM SEG overlays, and slide microscopy. No backend: the browser queries the IDC v3 SQL API, fetches public S3 objects (volumes, SEG) or IDC's DICOMweb proxy (slides), and converts DICOM with [dcm2niix](https://github.com/rordenlab/dcm2niix) (WebAssembly). Rendering: [NiiVue](https://github.com/niivue/niivue).
 
 ## Links
@@ -67,7 +69,7 @@ Browser checks (Playwright; need a running server, URL as argument, default `htt
 
 `tools/verify_seg.py` decodes a SEG independently (pydicom) and compares it with dcm2niix's label NIfTI in patient space; `tools/seg_points.py` and `tools/make_fixture.py` build the e2e fixtures (Python: numpy, pydicom, nibabel, scipy, highdicom). The anchor DICOM and conversions they read live in the gitignored `data/`.
 
-Pages: `.github/workflows/pages.yml` builds and deploys on push to `main` (not pushed yet).
+Pages: `.github/workflows/pages.yml` builds and deploys on push to `main` (https://niivue.github.io/idc/).
 
 ## Unreleased dependencies (`vendor/`)
 

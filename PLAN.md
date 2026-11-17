@@ -1,6 +1,6 @@
 # plan-idc: NiiVue as a lean IDC viewer
 
-Status: implementation authorized 2026-11-16 (loop). Canonical copy: this file. Read **Status** (end) first; update it last.
+Status: **paused 2026-11-17** (Chris): IDC support moves to nv-ohif (`~/src/mono/scratch/plan-idc-ohif.md`); this repo is frozen as a reference and acceptance oracle. Implementation was authorized 2026-11-16 (loop). Canonical copy: this file. Read **Status** (end) first; update it last.
 
 ## Decisions (Chris, 2026-11-16)
 

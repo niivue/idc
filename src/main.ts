@@ -239,7 +239,7 @@ function syncUi() {
       a.target = '_blank'
       a.rel = 'noopener'
       a.textContent = `doi:${s.doi}`
-      return [`${s.modality}: ${s.license}, `, a, document.createElement('br')]
+      return [`${s.modality}: ${s.license}, `, a, '  ']
     }),
   )
 }
@@ -272,19 +272,56 @@ gateCinematic()
 opacityEl.oninput = () => nv.volumes.length > 1 && nv.setVolume(1, { opacity: Number(opacityEl.value) })
 outlineEl.onchange = () => nv.volumes.length > 1 && nv.setVolume(1, { atlasOutline: outlineEl.checked ? 1 : 0 })
 
+// Datasets verified during development (README, PLAN.md); picking one opens that study.
+const EXAMPLES: [label: string, study: string, series?: string][] = [
+  ['CT + TotalSegmentator SEG (NLST)', '1.2.840.113654.2.55.187766322555605983451267194286230980878'],
+  ['CT + SEG, second pairing (NLST)', '1.2.840.113654.2.55.187766322555605983451267194286230980878', '1.2.276.0.7230010.3.1.3.313263360.40027.1706310312.485948'],
+  ['H&E slide, JPEG (CPTAC-LUAD)', '2.25.11321499043287739942958746184768363349'],
+  ['H&E slide, JPEG 2000 (CATCH)', '2.25.19454760007169100657755148757857609085'],
+  ['Multiplexed fluorescence, 3 channels (HTAN-OHSU)', '2.25.56219147941526607962658668060030231728', '1.3.6.1.4.1.5962.99.1.2000002781.2080371485.1655562444509.4.0'],
+  ['Uncompressed fluorescence slide (not supported)', '2.25.56219147941526607962658668060030231728', '1.3.6.1.4.1.5962.99.1.1999891937.339225835.1655562333665.4.0'],
+  ['MR, CC BY-NC bucket', '1.3.6.1.4.1.14519.5.2.1.186051521067863971269584893740842397538', '1.3.6.1.4.1.14519.5.2.1.175414966301645518238419021688341658582'],
+  ['CT + FRACTIONAL SEG (overlay not supported)', '1.3.6.1.4.1.14519.5.2.1.7695.2311.106039727348255984980483774237', '1.3.6.1.4.1.14519.5.2.1.7695.2311.230378240269972963231696070064'],
+]
+const exampleGroup = () => {
+  const g = document.createElement('optgroup')
+  g.label = 'Examples'
+  g.append(...EXAMPLES.map(([label], i) => new Option(label, `ex:${i}`)), new Option('Custom UID…', 'custom'))
+  return g
+}
+
 seriesEl.onchange = () => {
+  const open = (st: string, se?: string) =>
+    location.assign(`?${new URLSearchParams(se ? { StudyInstanceUIDs: st, SeriesInstanceUIDs: se } : { StudyInstanceUIDs: st })}`)
+  if (seriesEl.value.startsWith('ex:')) {
+    const [, st, se] = EXAMPLES[Number(seriesEl.value.slice(3))]
+    return open(st, se)
+  }
+  if (seriesEl.value === 'custom') {
+    const [st, se] = (prompt('IDC StudyInstanceUID, optionally followed by a space and a SeriesInstanceUID') ?? '').trim().split(/\s+/)
+    seriesEl.value = document.body.dataset.shown ?? '' // keep the menu on what is shown until the new page loads
+    if (!st) return
+    if (![st, se].every((u) => u === undefined || isUid(u))) return status(`Not a DICOM UID: ${st} ${se ?? ''}`, true)
+    return open(st, se)
+  }
   history.pushState(null, '', urlFor(seriesEl.value))
   show(seriesEl.value)
 }
 window.onpopstate = () => show(readUrl().series)
 
 try {
+  if (!new URLSearchParams(location.search).has('StudyInstanceUIDs')) {
+    seriesEl.replaceChildren(new Option('Choose an example…', ''), exampleGroup())
+    throw new Error('Choose an example or "Custom UID…" from the menu')
+  }
   const req = readUrl()
   study = req.study
   status('Querying IDC…')
   all = await studySeries(study)
   if (!all.length) throw new Error(`Study ${study} not found in IDC`)
-  seriesEl.replaceChildren(
+  const thisStudy = document.createElement('optgroup')
+  thisStudy.label = 'This study'
+  thisStudy.append(
     ...all.map((s) => {
       const why = unsupported(s, all)
       const o = new Option(`${s.modality} ${s.description} (${s.instances})${why ? ` — ${why}` : ''}`, s.uid)
@@ -292,6 +329,7 @@ try {
       return o
     }),
   )
+  seriesEl.replaceChildren(thisStudy, exampleGroup())
   await show(req.series)
 } catch (e) {
   status((e as Error).message, true)

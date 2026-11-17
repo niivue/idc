@@ -6,35 +6,37 @@
     <title>NiiVue IDC</title>
     <link rel="icon" href="data:," />
     <style>
-      :root { color-scheme: light dark; --bg: #fff; --fg: #111; --muted: #666; --line: #ccc; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #999; --line: #333; } }
+      :root { color-scheme: dark; --bg: #000; --bar: #1b1b1f; --fg: #e8e8ea; --muted: #9a9aa2; --line: #333338; --field: #2a2a30; --accent: #6ea8fe; }
       * { box-sizing: border-box; }
-      body { margin: 0; height: 100vh; display: grid; grid-template-columns: 300px 1fr; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; }
-      aside { overflow: auto; padding: 8px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
-      main { position: relative; min-width: 0; }
+      body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; }
+      header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 10px; background: var(--bar); border-bottom: 1px solid var(--line); }
+      header label { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+      select { max-width: min(46ch, 100%); font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
+      input[type='checkbox'], input[type='range'] { accent-color: var(--accent); }
+      input[type='range'] { width: 90px; }
+      label:has(input:disabled) { color: var(--muted); }
+      #segments { display: flex; align-items: center; gap: 14px; }
+      [hidden] { display: none !important; }
+      #status { color: var(--muted); white-space: pre-wrap; min-width: 0; }
+      #status.error { color: #ff7b72; }
+      #credit { color: var(--muted); font-size: 11px; margin-left: auto; }
+      #credit a { color: var(--accent); }
+      main { position: relative; min-width: 0; min-height: 0; }
       canvas { width: 100%; height: 100%; display: block; }
-      canvas[hidden] { display: none; }
-      select, button { width: 100%; font: inherit; }
-      #status { color: var(--muted); white-space: pre-wrap; }
-      #status.error { color: #d33; }
-      .row { display: flex; gap: 6px; align-items: center; }
-      #credit { color: var(--muted); font-size: 11px; }
-      @media (max-width: 700px) { body { grid-template-columns: 1fr; grid-template-rows: auto 60vh; } aside { max-height: 40vh; } }
     </style>
   </head>
   <body>
-    <aside>
-      <label>Series <select id="series"></select></label>
-      <select id="slidePath" hidden title="Optical path / focal plane"></select>
-      <div id="status">Loading…</div>
-      <label><input id="cinematic" type="checkbox" /> Cinematic 3D (needs a GPU)</label>
-      <div id="segments" hidden>
-        <div class="row"><label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
-          <label><input id="outline" type="checkbox" /> Outline</label></div>
-        <small>Legend: click a colour box to hide/show it, double-click to show only it (again: all).</small>
+    <header>
+      <select id="series" aria-label="Series"></select>
+      <select id="slidePath" hidden title="Optical path / focal plane" aria-label="Optical path"></select>
+      <div id="segments" hidden title="Legend: click a colour box to hide/show it, double-click to show only it (again: all).">
+        <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+        <label><input id="outline" type="checkbox" /> Outline</label>
       </div>
+      <label title="Path-traced 3D with per-structure materials (CT, WebGPU)"><input id="cinematic" type="checkbox" /> Cinematic</label>
+      <div id="status">Loading…</div>
       <div id="credit"></div>
-    </aside>
+    </header>
     <main><canvas id="gl"></canvas><canvas id="slide" hidden></canvas></main>
     <script type="module" src="/src/main.ts"></script>
   </body>

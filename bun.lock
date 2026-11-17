@@ -5,7 +5,7 @@
     "": {
       "name": "niivue-idc",
       "dependencies": {
-        "@niivue/dcm2niix": "file:./vendor/dcm2niix-6e8c84f.tgz",
+        "@niivue/dcm2niix": "file:./vendor/dcm2niix-8315639.tgz",
         "@niivue/niivue": "file:./vendor/niivue-de81ece0.tgz",
         "@niivue/nv-ext-tile": "file:./vendor/nv-ext-tile-de81ece0.tgz",
       },
@@ -81,7 +81,7 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
-    "@niivue/dcm2niix": ["@niivue/dcm2niix@./vendor/dcm2niix-6e8c84f.tgz", {}, "sha512-F5vgYEeDsnRJselvTEQUuOF4vu/SQCecZXfluqcyC52sGe2twgoCE7XloGR8M11Hof92x9ic8DDw7BPO/4wsgA=="],
+    "@niivue/dcm2niix": ["@niivue/dcm2niix@./vendor/dcm2niix-8315639.tgz", {}, "sha512-hsaNaCFDjdo18qabfRiY8g05y5zxtEX+ViVE/7hTZmgOR709Nv+0S9yoAGegfSsD/DpNjXqtRvaXNaWGa23lHA=="],
 
     "@niivue/geotiff-rs": ["@niivue/geotiff-rs@3.1.0-rc.0", "", { "dependencies": { "@petamoriken/float16": "^3.9.3", "lerc": "^3.0.0", "pako": "^2.0.4", "quick-lru": "^6.1.1", "web-worker": "^1.5.0", "xml-utils": "^1.10.2", "zstddec": "^0.2.0" } }, "sha512-mmaU08MDlhpMrMe7f6++6kqV8upfc327z1hmNzOn3TNPoZSbKKzlD1713AxMpj406ocS/EvpsUsmIBJoUhuJig=="],
 

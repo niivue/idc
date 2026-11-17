@@ -52,3 +52,7 @@ Housekeeping: failed-GET retrieval case added. Not done (recorded for Chris): We
 ## Audit 2026-11-17
 
 See audit_response.md. Safari 27.2 (real, safaridriver): CPTAC JPEG slide was solid cyan → IDC proxy transcoded `type="image/jpeg"` requests to lossless JPEG (SOF3, 25 KB vs stored 4.3 KB baseline); nv-ext-tile de81ece0 requests the stored syntax; Safari renders both slides and the anchor CT+SEG (WebGPU, 74 segments). After all fixes, built app under `/idc/`: headless + WebGPU offline/live/slide + cinematic = 73 checks pass; WebKit offline/live/slide 31 pass.
+
+## dcm2niix reference audit 2026-11-17
+
+External audit of 6e8c84f: two P2s (multiple referenced series collapsed to the first; implicit-VR (0008,1200) references skipped). Fixed in 4843716; an internal review then found that explicit VR also captured unrelated nested series UIDs (RelatedSeriesSequence) and that an empty UID was read uninitialized, fixed in 8315639 (latched to (0008,1115)). The sidecar `ReferencedSeriesInstanceUID` is now an array; the app checks membership. test_seg.py passes, dcm_qa matches the baseline, and the IDC offline (5) and live (16) suites pass with vendored `dcm2niix-8315639.tgz`.

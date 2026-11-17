@@ -33,3 +33,8 @@ Declined: dropping the post-install abort check entirely (needed: no await follo
 ## Verification
 
 `bun test src` (4 tests, 11 expects); mono niivue cmap tests 181 pass, nv-ext-tile 463 pass. Built app under `/idc/`: offline/live/slide headless + WebGPU and cinematic: 73 checks pass; WebKit 31 pass. Real Safari: both slides and anchor CT+SEG (WebGPU) render.
+
+# Response: audit_temp.md (7322952, 2026-11-17)
+
+- **No findings in the reviewed commit: agreed** (documentation only; the WebKit total of 5 + 15 + 11 = 31 checks matches the harness).
+- **Linked dcm2niix findings (multiple SEG references; implicit-VR cross-study references): fixed** on dcm2niix `idc/seg-refs` 8315639 (see `../dcm2niix/audit_response.md`). `ReferencedSeriesInstanceUID` is now an array, and `src/main.ts` requires that the shown image's series be a member and that the FrameOfReferenceUID match. Vendored `vendor/dcm2niix-8315639.tgz`. Offline (5) and live (16) suites pass, as do `bun test src` and the build.

@@ -188,7 +188,8 @@ async function load(requested: string | undefined, ac: AbortController) {
       const segs = (out.json?.Segments as Segment[] | undefined) ?? []
       if (!segs.length) throw new Error('Segmentation has no Segments table')
       // The index's segmented_SeriesInstanceUID is a hint; the SEG object itself must agree.
-      if (out.json?.ReferencedSeriesInstanceUID !== sel.base.uid || out.json?.FrameOfReferenceUID !== baseFrameOfRef)
+      const refs = out.json?.ReferencedSeriesInstanceUID // every referenced series (a SEG may derive from several)
+      if (!(Array.isArray(refs) && refs.includes(sel.base.uid)) || out.json?.FrameOfReferenceUID !== baseFrameOfRef)
         throw new Error('Segmentation does not reference the image shown (series or frame of reference differs)')
       const maps = segColormaps(segs, lookupColorMap('totalsegmentator'))
       const cmap = nv.addColormap(`seg-${sel.seg.uid}`, maps.flat)

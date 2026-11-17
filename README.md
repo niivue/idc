@@ -25,6 +25,26 @@ Static, read-only viewer for [Imaging Data Commons](https://portal.imaging.datac
 
 Licence and source DOI are shown for the image and the SEG. Large SM objects in S3 have no frame offset table, which is why slides come from the DICOMweb proxy.
 
+## Slide metadata and the effective manifest
+
+DICOM WSI has no required separate manifest, and the first DICOM instance is not a master index. Each instance describes its own frames; a slide's resolution levels and tiles can span several instances. This organization is independent of pixel compression (this viewer currently supports compressed frames only).
+
+Fetch metadata for **all instances in the series** with `GET <DICOMweb-base>/studies/<studyUID>/series/<seriesUID>/metadata`. For IDC, using the chosen `studyUid` and `seriesUid`:
+
+```ts
+import { indexDicomWsiMetadata } from '@niivue/nv-ext-tile/dicom'
+
+const base = 'https://proxy.imaging.datacommons.cancer.gov/current/viewer-only-no-downloads-see-tinyurl-dot-com-slash-3j3d9jyp/dicomWeb'
+const seriesUrl = `${base}/studies/${studyUid}/series/${seriesUid}`
+const response = await fetch(`${seriesUrl}/metadata`)
+if (!response.ok) throw new Error(`Slide metadata: HTTP ${response.status}`)
+const { slides } = indexDicomWsiMetadata(await response.json())
+```
+
+The response is DICOM JSON metadata, not the pixel payloads. `indexDicomWsiMetadata()` builds an **in-memory effective manifest**: resolution levels, tile positions, optical paths and focal planes, with each tile identified by its SOP Instance UID and frame number. The viewer does not write a `manifest.json`.
+
+In [loadSlide](src/main.ts), `DicomWebWsiSource.open(slides[i], { seriesUrl }, signal)` supplies the selected slide to `NVSlide.fromSource()`. Tiles are retrieved as needed from `${seriesUrl}/instances/<SOPInstanceUID>/frames/<frameNumber>`. These references identify frames, not byte offsets into the original S3 files. The optical-path / focal-plane picker selects among `slides`.
+
 ## Develop
 
 ```
@@ -55,7 +75,7 @@ Until npm releases carry these changes, the app installs local builds:
 
 | File | sha256 | Source |
 |---|---|---|
-| `dcm2niix-6e8c84f.tgz` | `e18de55b…dfb3984f` | dcm2niix `idc/seg-refs` 6e8c84f (on `development` 67379e8, SEG → label NIfTI): sidecar FrameOfReferenceUID / ReferencedSeriesInstanceUID |
+| `dcm2niix-8315639.tgz` | `51f5f433…82b5ce8f` | dcm2niix `idc/seg-refs` 8315639 (6e8c84f, 4843716, 8315639 on `development` 67379e8, SEG → label NIfTI): sidecar FrameOfReferenceUID and `ReferencedSeriesInstanceUID` array (every series in ReferencedSeriesSequence, incl. (0008,1200)) |
 | `niivue-de81ece0.tgz` | `52cd7393…6f6cf087` | mono `idc/seg-materials` (c9f52e55 + 794113f6): bundled `totalsegmentator` table, TotalSegmentator v2 `total` IDs, SNOMED codes, materials |
 | `nv-ext-tile-de81ece0.tgz` | `732bb709…d8bbc313` | same branch, de81ece0: WADO-RS JPEG tiles request their stored transfer syntax |
 
@@ -63,4 +83,4 @@ Full hashes: `shasum -a 256 vendor/*.tgz`.
 
 Rebuild: dcm2niix `cd js && PIXI_PROJECT_ROOT=<checkout with built openjpeg-2.5.3> npm run build && npm pack` with emscripten 3.1.58 (pixi env; Homebrew emscripten 7 fails to link); mono `bun run build && bun pm pack` in `packages/niivue` and `packages/nv-ext-tile`. Rename the packs to `vendor/<pkg>-<commit>.tgz`, update `package.json`, run `bun install` (bun.lock integrity).
 
-Release order: npm releases must contain dcm2niix 6e8c84f (without it every SEG fails the reference check, `src/main.ts`), the mono table commits (else no 3D materials) and the nv-ext-tile fix (else Safari shows JPEG slides blank).
+Release order: npm releases must contain dcm2niix 8315639 (without it every SEG fails the reference check in `src/main.ts`, which expects the array), the mono table commits (else no 3D materials) and the nv-ext-tile fix (else Safari shows JPEG slides blank).

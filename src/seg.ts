@@ -16,11 +16,6 @@ const conceptOf = (s: Segment) =>
 // ponytail: soft-tissue material for segments the table lacks (e.g. TotalSegmentator v1 heart chambers).
 const DEFAULT = { A: 220, S: 190, lo: -40, hi: 20, surface: 200 }
 
-/**
- * Label colormaps for a SEG's segments, keeping the SEG's own names and colours:
- * `flat` for 2D (opaque), `cinematic` adds per-label materials found by SNOMED
- * code in `materials` (NiiVue's bundled `totalsegmentator` table).
- */
 // Golden-angle hues: distinct colours for segments without a recommended display colour.
 const fallbackRGB = (i: number): [number, number, number] => {
   const h = (i * 137.508) % 360
@@ -31,6 +26,11 @@ const fallbackRGB = (i: number): [number, number, number] => {
   return [f(0), f(8), f(4)]
 }
 
+/**
+ * Label colormaps for a SEG's segments, keeping the SEG's own names and colours:
+ * `flat` for 2D (opaque), `cinematic` adds per-label materials found by SNOMED
+ * code in `materials` (NiiVue's bundled `totalsegmentator` table).
+ */
 export function segColormaps(segs: Segment[], materials: ColorMap | null) {
   const index = new Map(materials?.codes?.map((c, i) => [c, i]))
   const rows = segs.map((s) => index.get(conceptOf(s)))

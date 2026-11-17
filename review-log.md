@@ -48,3 +48,7 @@ Advice and disposition:
 7. No README → added (URL recipe, object matrix, limits, rebuild commands, vendor sha256, release-order trap).
 8. No offline fixture → `tools/make_fixture.py` (synthetic 16×12×4 CT + 2-segment off-centre SEG, 28 KB) + `e2e/offline.mjs` (IDC/S3 routed to the fixture). It caught a real bug: a SEG without RecommendedDisplayCIELab crashed the overlay; now fallback colours.
 Housekeeping: failed-GET retrieval case added. Not done (recorded for Chris): WebGL2 bug repro not yet narrowed with example data on Metal; mono full CI not run.
+
+## Audit 2026-11-17
+
+See audit_response.md. Safari 27.2 (real, safaridriver): CPTAC JPEG slide was solid cyan → IDC proxy transcoded `type="image/jpeg"` requests to lossless JPEG (SOF3, 25 KB vs stored 4.3 KB baseline); nv-ext-tile de81ece0 requests the stored syntax; Safari renders both slides and the anchor CT+SEG (WebGPU, 74 segments). After all fixes, built app under `/idc/`: headless + WebGPU offline/live/slide + cinematic = 73 checks pass.

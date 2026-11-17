@@ -3,7 +3,7 @@ import { fetchSeries, type Series, select } from './idc'
 
 const s = (uid: string, o: Partial<Series>): Series => ({
   uid, modality: 'CT', description: '', instances: 129, bucket: 'b', uuid: uid,
-  license: 'CC BY 4.0', doi: '', segType: null, segments: null, segmentedUid: null, regular: true, ...o,
+  license: 'CC BY 4.0', doi: '', segType: null, segmentedUid: null, regular: true, ...o,
 })
 // Anchor-study shape: two CT/SEG pairs, a localizer, an SR, plus a SEG whose base is missing.
 const study = [
@@ -14,7 +14,8 @@ const study = [
   s('2.3', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '1.3' }),
   s('2.1', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '9.9' }),
   s('2.7', { modality: 'SEG', instances: 1, segType: 'FRACTIONAL', segmentedUid: '1.9' }),
-  s('3.1', { modality: 'SR', instances: 1, regular: null }),
+  s('4.1', { modality: 'SM', instances: 6, regular: null }),
+  s('4.2', { modality: 'SEG', instances: 1, segType: 'BINARY', segmentedUid: '4.1' }),
 ]
 
 test('study-only link picks the first viewable SEG pair by UID, skipping a missing base', () => {
@@ -32,6 +33,8 @@ test('missing or unviewable requested series is reported, not replaced', () => {
   expect(() => select(study, '7.7')).toThrow('not in this study')
   expect(() => select(study, '2.1')).toThrow('referenced series not in study')
   expect(() => select(study, '1.5')).toThrow('not a regular 3D volume')
+  // A SEG on a slide is not drawable: shown as the slide with the reason, never silently dropped.
+  expect(select(study, '4.2').refused).toBe('Segmentation not shown: slide segmentation not supported')
   // Unsupported SEG type: its base still shows, with the reason.
   expect(select(study, '2.7')).toEqual({ base: study[0], refused: 'Segmentation not shown: FRACTIONAL SEG not supported' })
 })

@@ -15,7 +15,6 @@ export type Series = {
   license: string
   doi: string
   segType: string | null
-  segments: number | null
   segmentedUid: string | null
   regular: boolean | null
 }
@@ -27,10 +26,10 @@ export function isUid(s: string): boolean {
   return s.length <= 64 && UID.test(s)
 }
 
-export async function studySeries(study: string, signal?: AbortSignal): Promise<Series[]> {
+export async function studySeries(study: string): Promise<Series[]> {
   const sql = `SELECT i.SeriesInstanceUID, i.Modality, i.SeriesDescription, i.instanceCount,
     i.aws_bucket, i.crdc_series_uuid, i.license_short_name, i.source_DOI,
-    s.SegmentationType, s.total_segments, s.segmented_SeriesInstanceUID, g.regularly_spaced_3d_volume
+    s.SegmentationType, s.segmented_SeriesInstanceUID, g.regularly_spaced_3d_volume
     FROM index i
     LEFT JOIN seg_index s ON s.SeriesInstanceUID = i.SeriesInstanceUID
     LEFT JOIN volume_geometry_index g ON g.SeriesInstanceUID = i.SeriesInstanceUID
@@ -39,7 +38,6 @@ export async function studySeries(study: string, signal?: AbortSignal): Promise<
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sql, params: [study], max_rows: 1000 }),
-    signal,
   })
   if (!res.ok) throw new Error(`IDC query failed: HTTP ${res.status} ${await res.text()}`)
   const body = await res.json()
@@ -54,7 +52,6 @@ export async function studySeries(study: string, signal?: AbortSignal): Promise<
     license: r.license_short_name,
     doi: r.source_DOI,
     segType: r.SegmentationType ?? null,
-    segments: r.total_segments ?? null,
     segmentedUid: r.segmented_SeriesInstanceUID ?? null,
     regular: r.regularly_spaced_3d_volume ?? null,
   }))
@@ -64,14 +61,15 @@ export async function studySeries(study: string, signal?: AbortSignal): Promise<
 export function unsupported(s: Series, all: Series[]): string | undefined {
   if (s.modality === 'SEG') {
     if (s.segType !== 'BINARY') return `${s.segType ?? 'unknown'} SEG not supported`
-    const base = all.find((b) => b.uid === s.segmentedUid)
+    const base = baseOf(s, all)
     if (!base) return 'referenced series not in study'
+    if (base.modality === 'SM') return 'slide segmentation not supported'
     return unsupported(base, all) && 'referenced series not viewable'
   }
-  if (s.modality === 'SM') return undefined
-  if (s.regular !== true) return 'not a regular 3D volume'
-  return undefined
+  if (s.modality !== 'SM' && s.regular !== true) return 'not a regular 3D volume'
 }
+
+const baseOf = (seg: Series, all: Series[]) => all.find((b) => b.uid === seg.segmentedUid)
 
 const byUid = (a: Series, b: Series) => (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0)
 
@@ -85,15 +83,15 @@ export function select(all: Series[], requested?: string): Selection {
     const s = all.find((x) => x.uid === requested)
     if (!s) throw new Error(`Series ${requested} is not in this study`)
     const why = unsupported(s, all)
-    const base = all.find((b) => b.uid === s.segmentedUid)
+    const base = baseOf(s, all)
     // An unsupported SEG still shows the image it segments, with the reason.
     if (why && s.modality === 'SEG' && base && !unsupported(base, all)) return { base, refused: `Segmentation not shown: ${why}` }
     if (why) throw new Error(`Series ${requested}: ${why}`)
     if (s.modality !== 'SEG') return { base: s }
-    return { base: all.find((b) => b.uid === s.segmentedUid) as Series, seg: s }
+    return { base: base as Series, seg: s }
   }
   const seg = all.filter((s) => s.modality === 'SEG' && !unsupported(s, all)).sort(byUid)[0]
-  if (seg) return { base: all.find((b) => b.uid === seg.segmentedUid) as Series, seg }
+  if (seg) return { base: baseOf(seg, all) as Series, seg }
   const base = all
     .filter((s) => s.modality !== 'SEG' && !unsupported(s, all))
     .sort((a, b) => b.instances - a.instances || byUid(a, b))[0]

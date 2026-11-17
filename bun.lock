@@ -6,8 +6,8 @@
       "name": "niivue-idc",
       "dependencies": {
         "@niivue/dcm2niix": "file:./vendor/dcm2niix-6e8c84f.tgz",
-        "@niivue/niivue": "file:./vendor/niivue-c9f52e55.tgz",
-        "@niivue/nv-ext-tile": "1.0.0-rc.122",
+        "@niivue/niivue": "file:./vendor/niivue-de81ece0.tgz",
+        "@niivue/nv-ext-tile": "file:./vendor/nv-ext-tile-de81ece0.tgz",
       },
       "devDependencies": {
         "playwright": "1.64.1",
@@ -85,9 +85,9 @@
 
     "@niivue/geotiff-rs": ["@niivue/geotiff-rs@3.1.0-rc.0", "", { "dependencies": { "@petamoriken/float16": "^3.9.3", "lerc": "^3.0.0", "pako": "^2.0.4", "quick-lru": "^6.1.1", "web-worker": "^1.5.0", "xml-utils": "^1.10.2", "zstddec": "^0.2.0" } }, "sha512-mmaU08MDlhpMrMe7f6++6kqV8upfc327z1hmNzOn3TNPoZSbKKzlD1713AxMpj406ocS/EvpsUsmIBJoUhuJig=="],
 
-    "@niivue/niivue": ["@niivue/niivue@./vendor/niivue-c9f52e55.tgz", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.1" }, "peerDependencies": { "@webgpu/types": ">=0.1.69" } }, "sha512-pMJBX8vGaU6pSJGVdJ4eVArkiwGp5erWUEq/AaivAKKj4CWLGAoUZ+ndwinyYeEqO3Pr0wImVoL6pRPkrYnWSQ=="],
+    "@niivue/niivue": ["@niivue/niivue@./vendor/niivue-de81ece0.tgz", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.1" }, "peerDependencies": { "@webgpu/types": ">=0.1.69" } }, "sha512-B/2BYjB1r6hkWvGtrVLuqOlkL1TCmP4hEJapyIX5s6NC1C2XcQD2VMXLclGYd+iPhfDPBuu99wgkfExpNFkbbg=="],
 
-    "@niivue/nv-ext-tile": ["@niivue/nv-ext-tile@1.0.0-rc.122", "", { "dependencies": { "@niivue/geotiff-rs": "3.1.0-rc.0", "@niivue/zarrita-rs": "0.7.5-rc.1" }, "peerDependencies": { "@niivue/dcm2niix": "^1.4.20261105-rc.3", "@niivue/niivue": "^1.0.0-rc.213" }, "optionalPeers": ["@niivue/dcm2niix"] }, "sha512-Qix3Jx1U/jIHS0b34CPA9rUc0QYo/xvEWauFODU1pbulgy69T2aQOLsIj7rl99+/WjWzfIOQmIQiArNN3Mps0g=="],
+    "@niivue/nv-ext-tile": ["@niivue/nv-ext-tile@./vendor/nv-ext-tile-de81ece0.tgz", { "dependencies": { "@niivue/geotiff-rs": "3.1.0-rc.0", "@niivue/zarrita-rs": "0.7.5-rc.1" }, "peerDependencies": { "@niivue/dcm2niix": "^1.4.20261105-rc.3", "@niivue/niivue": "^1.0.0-rc.215" }, "optionalPeers": ["@niivue/dcm2niix"] }, "sha512-2qIhR4QLM6T1AKI8/Darrwlevldr9UXebPWwbEEaRHWMOpVYr+GbIGAmkQNOt2Sxn/2gZPzeesEyK1rIBSo8WQ=="],
 
     "@niivue/zarrita-rs": ["@niivue/zarrita-rs@0.7.5-rc.1", "", { "dependencies": { "@zarrita/storage": "^0.2.0", "numcodecs": "^0.3.2" } }, "sha512-GkZ5uqObf72fWvAK5wyixdRoTs/PB6s2Wh72uShyqA1N4Tki05SOdkKy8CQVPhs0h/OqUubJi1lUWTkKY4tZbA=="],
 

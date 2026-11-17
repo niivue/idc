@@ -1,18 +1,12 @@
 // Cinematic 3D on a real GPU (headed Chrome, Metal): node e2e/cinematic.mjs [baseUrl]. SwiftShader cannot
 // path-trace the anchor volume in time, so this is a local check, not CI.
-import { chromium } from 'playwright'
+import { ANCHOR_STUDY as STUDY, harness, LUNG_CT, launch } from './lib.mjs'
 
-const base = process.argv[2] ?? 'http://localhost:5299/'
-const STUDY = '1.2.840.113654.2.55.187766322555605983451267194286230980878'
-const LUNG_CT = '1.2.840.113654.2.55.122344168497038128022524906545138736420'
+const base = process.argv[2] ?? 'http://localhost:5173/'
 const shot = process.env.SHOT ?? 'cinematic'
-const browser = await chromium.launch({ headless: false, args: ['--use-angle=metal', '--enable-unsafe-webgpu'] })
+const browser = await launch(true)
 const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
-const errors = []
-page.on('pageerror', (e) => errors.push(e.message))
-page.on('console', (m) => (m.type() === 'error' || /cinematic:/.test(m.text())) && errors.push(`${m.text()} ${m.location().url}`))
-let failed = 0
-const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
+const { check, noErrors, done } = harness(page, (m) => m.type() === 'error' || /cinematic:/.test(m.text()))
 // Fraction of the canvas area that is not background, from a screenshot (a WebGL/WebGPU canvas
 // cannot be read back without preserveDrawingBuffer). A black render is the failure being guarded.
 const lit = async () => {
@@ -46,6 +40,6 @@ check((await lit()) > 0.05, 'CT renders')
 await page.screenshot({ path: `${shot}-ct.png` })
 await page.uncheck('#cinematic')
 check((await page.evaluate(() => [nv.volumeRenderMode, nv.volumes[0].colormap].join())) === '0,gray', 'off restores grey composite')
-check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+noErrors()
 await browser.close()
-process.exit(failed ? 1 : 0)
+done()

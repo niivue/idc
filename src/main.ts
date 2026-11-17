@@ -26,21 +26,19 @@ Object.assign(globalThis, { nv }) // console/e2e handle
 registerDcm2niixDecoders() // JPEG 2000 / JPEG-LS slide tiles and ICC colour; workers load on first use
 nv.addColormap('ct_cinematic', ctCinematic) // CT transfer function from NiiVue's cinematic example
 nv.volumeCinematic = { ao: 0.9, aoRadiusMM: 20 } // settings suggested by the TotalSegmentator table
-let flatCmap = ''
-let cinematicCmap = ''
 let baseWindow: { calMin: number; calMax: number } | undefined
 
 let study = ''
 let all: Series[] = []
 let shown: Selection | undefined
 let baseFrameOfRef: unknown
-let segments: Segment[] = []
-let materialsMatched = 0
+let segCmap = '' // flat label colormap of the shown SEG; `-3d` adds materials
+let segSummary = ''
 let splitNote = ''
 let active: AbortController | undefined
 let slideView: SlideView | undefined
 const glCanvas = $<HTMLCanvasElement>('gl')
-const slideCanvas = $<HTMLCanvasElement>('slide')
+let slideCanvas = $<HTMLCanvasElement>('slide')
 
 function showCanvas(slide: boolean) {
   slideCanvas.hidden = !slide
@@ -60,10 +58,18 @@ async function loadSlide(s: Series, signal: AbortSignal) {
   // One slide per optical path and focal plane (nv-ext-tile): offer them all, show the first.
   const open = async (i: number, sig: AbortSignal) => {
     const source = await DicomWebWsiSource.open(slides[i], { seriesUrl: url }, sig)
-    if (sig.aborted) return source.dispose()
-    showCanvas(true)
-    slideView ??= await createSlideView(slideCanvas)
-    slideView.setSlide(NVSlide.fromSource(source))
+    try {
+      if (!slideView) {
+        slideView = await createSlideView(slideCanvas)
+        slideCanvas = slideView.canvas // a replacement when a failed WebGPU start spoiled the original
+      }
+      if (sig.aborted) return source.dispose()
+      showCanvas(true)
+      slideView.setSlide(NVSlide.fromSource(source))
+    } catch (e) {
+      source.dispose()
+      throw e
+    }
   }
   await open(0, signal)
   if (signal.aborted) return
@@ -71,9 +77,13 @@ async function loadSlide(s: Series, signal: AbortSignal) {
     ...slides.map((x, i) => new Option(`${x.opticalPath}${x.zOffsetUm === undefined ? '' : ` z ${x.zOffsetUm} µm`}`, String(i))),
   )
   slidePathEl.hidden = slides.length < 2
+  let pathAc: AbortController | undefined
   slidePathEl.onchange = () => {
-    const ac = new AbortController() // ponytail: not queued with series loads; a series switch hides this control
-    open(Number(slidePathEl.value), ac.signal).catch((e) => status((e as Error).message, true))
+    // A newer path choice or any series switch (which aborts `signal`) supersedes this open.
+    pathAc?.abort()
+    pathAc = new AbortController()
+    const sig = AbortSignal.any([signal, pathAc.signal])
+    open(Number(slidePathEl.value), sig).catch((e) => sig.aborted || status((e as Error).message, true))
   }
   segPanel.hidden = true
   shown = { base: s }
@@ -108,28 +118,23 @@ function urlFor(series?: string): string {
 type Timing = { label: string; download: number; convert: number; render: number }
 const timings: Timing[] = []
 Object.assign(globalThis, { timings })
-let pending: Timing | undefined
-const frame = () => new Promise((r) => requestAnimationFrame(r))
-/** Close the timing of the install just made: time from conversion end to the next painted frame. */
-async function rendered(t0: number) {
-  await frame()
-  if (pending) timings.push({ ...pending, render: Math.round(performance.now() - t0) })
-  pending = undefined
-}
+/** Record an install's timing once the next frame paints; not awaited, as rAF pauses in background tabs. */
+const rendered = (t: Timing, t0: number) =>
+  requestAnimationFrame(() => timings.push({ ...t, render: Math.round(performance.now() - t0) }))
 
-async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{ out: Converted; first: File }> {
+async function toNifti(s: Series, signal: AbortSignal, label: string): Promise<{ out: Converted; first: File; timing: Timing }> {
   const t0 = performance.now()
   const files = await fetchSeries(s, signal, (d, t) => status(`${label}: downloading ${d}/${t}`))
   const t1 = performance.now()
   status(`${label}: converting`)
   const { series, log } = await convert(files, { args: ['-z', 'n', '-ba', 'o'], signal })
-  pending = { label, download: Math.round(t1 - t0), convert: Math.round(performance.now() - t1), render: 0 }
+  const timing = { label, download: Math.round(t1 - t0), convert: Math.round(performance.now() - t1), render: 0 }
   // ponytail: largest NIfTI wins when a series splits (named in the status); add a picker when a real study needs one.
   const outs = series.filter((x) => x.image.name.endsWith('.nii')).sort((a, b) => b.image.size - a.image.size)
   const out = outs[0]
   if (!out) throw new Error(`${label}: dcm2niix produced no image\n${log.slice(-5).join('\n')}`)
   if (outs.length > 1) splitNote += `\n${label}: series split into ${outs.length} outputs; showing ${out.stem}`
-  return { out, first: files[0] }
+  return { out, first: files[0], timing }
 }
 
 let queue: Promise<void> = Promise.resolve()
@@ -148,42 +153,38 @@ async function load(requested: string | undefined, ac: AbortController) {
   const { signal } = ac
   if (signal.aborted) return
   splitNote = ''
+  const prev = shown
   try {
     const sel = select(all, requested)
     if (sel.base.modality === 'SM') {
       if (shown?.base.uid !== sel.base.uid) await loadSlide(sel.base, signal)
-      if (!signal.aborted) {
-        gateCinematic()
-        syncUi()
-      }
+      if (signal.aborted) return
+      if (sel.refused) status(sel.refused, true)
+      gateCinematic()
+      syncUi()
       return
     }
-    if (shown?.base.modality === 'SM') {
-      shown = undefined
-      showCanvas(false)
-    }
     if (shown?.base.uid !== sel.base.uid) {
-      const { out, first } = await toNifti(sel.base, signal, 'Image')
+      const { out, first, timing } = await toNifti(sel.base, signal, 'Image')
       const win = dicomWindow(await first.slice(0, 65536).arrayBuffer())
       const tr = performance.now()
       const vol = await nv.prepareVolume({ url: out.image, name: out.image.name, ...win })
       if (signal.aborted) return
+      showCanvas(false) // leaving a slide only once the new image is ready
       await nv.loadVolumes([vol])
-      await rendered(tr)
+      rendered(timing, tr)
       baseWindow = { calMin: vol.calMin, calMax: vol.calMax }
       shown = { base: sel.base }
       baseFrameOfRef = out.json?.FrameOfReferenceUID
       segPanel.hidden = true
-      if (signal.aborted) return
     } else if (shown.seg && shown.seg.uid !== sel.seg?.uid) {
       await nv.removeVolume(1)
       shown = { base: sel.base }
       segPanel.hidden = true
-      if (signal.aborted) return
     }
     if (sel.seg && shown?.seg?.uid !== sel.seg.uid) {
       status('Image ready; loading segmentation…')
-      const { out } = await toNifti(sel.seg, signal, 'Segmentation')
+      const { out, timing } = await toNifti(sel.seg, signal, 'Segmentation')
       const segs = (out.json?.Segments as Segment[] | undefined) ?? []
       if (!segs.length) throw new Error('Segmentation has no Segments table')
       // The index's segmented_SeriesInstanceUID is a hint; the SEG object itself must agree.
@@ -191,8 +192,7 @@ async function load(requested: string | undefined, ac: AbortController) {
         throw new Error('Segmentation does not reference the image shown (series or frame of reference differs)')
       const maps = segColormaps(segs, lookupColorMap('totalsegmentator'))
       const cmap = nv.addColormap(`seg-${sel.seg.uid}`, maps.flat)
-      const cmap3d = nv.addColormap(`seg-${sel.seg.uid}-3d`, maps.cinematic)
-      materialsMatched = maps.matched
+      nv.addColormap(`seg-${sel.seg.uid}-3d`, maps.cinematic)
       const tr = performance.now()
       const vol = await nv.prepareVolume({
         url: out.image,
@@ -203,24 +203,24 @@ async function load(requested: string | undefined, ac: AbortController) {
       })
       if (signal.aborted) return
       await nv.addVolume(vol)
-      await rendered(tr)
-      flatCmap = cmap
-      cinematicCmap = cmap3d
+      rendered(timing, tr)
       shown = sel
-      segments = segs
+      segCmap = cmap
+      segSummary = `${segs.length} segments (${maps.matched} with 3D materials)`
       segPanel.hidden = false
-      if (signal.aborted) return
     }
-    gateCinematic()
-    setCinematic(cinematicEl.checked)
+    if (signal.aborted) return
     if (sel.refused) status(sel.refused + splitNote, true)
-    else status((shown?.seg ? `${segments.length} segments (${materialsMatched} with 3D materials)` : 'Ready') + splitNote)
+    else status((shown?.seg ? segSummary : 'Ready') + splitNote)
   } catch (e) {
     if (signal.aborted) return
     ac.abort() // stop this load's remaining downloads/workers
-    status(`${(e as Error).message}${shown ? '\nShowing the previous selection.' : ''}`, true)
+    const note = shown === prev ? (shown ? '\nShowing the previous selection.' : '') : '\nShowing the image without its segmentation.'
+    status(`${(e as Error).message}${note}`, true)
   }
-  // Keep the URL and selector on what is actually shown.
+  // Keep cinematic state, the URL and the selector on what is actually shown, also after a partial failure.
+  gateCinematic()
+  if (shown?.base.modality !== 'SM') setCinematic(cinematicEl.checked)
   syncUi()
 }
 
@@ -252,7 +252,7 @@ function setCinematic(on: boolean) {
   // The base colormap is the transfer function in cinematic mode; 2D slices keep grey + DICOM window.
   nv.setVolume(0, on ? { colormap: 'ct_cinematic', calMin: ctCinematic.min, calMax: ctCinematic.max } : { colormap: 'gray', ...baseWindow })
   if (hasSeg) {
-    nv.setVolume(1, { colormap: on ? cinematicCmap : flatCmap })
+    nv.setVolume(1, { colormap: `${segCmap}${on ? '-3d' : ''}` })
     nv.volumeCinematic = { labelMode: 'only' }
   } else nv.volumeCinematic = { labelMode: 'unlabeled' } // CT alone: the transfer function shows everything
 }

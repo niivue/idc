@@ -1,24 +1,19 @@
 // Live slide smoke (IDC DICOMweb proxy): node e2e/slide.mjs [baseUrl]. Not for CI.
-import { gpu, launch } from './launch.mjs'
+import { harness, launch } from './lib.mjs'
 
-const base = process.argv[2] ?? 'http://localhost:5299/'
+const base = process.argv[2] ?? 'http://localhost:5173/'
 // CC BY 4.0 slides from two collections and codecs: CPTAC-LUAD JPEG baseline (series 162 MB),
 // CATCH JPEG 2000 (series 239 MB; needs dcm2niix decoders).
 const SLIDES = [['2.25.11321499043287739942958746184768363349', 162e6], ['2.25.19454760007169100657755148757857609085', 239e6]]
 const browser = await launch()
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
-const errors = []
-page.on('pageerror', (e) => errors.push(e.message))
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+const { errors, check, backendCheck, noErrors, done } = harness(page)
 let frames = 0, bytes = 0, metaBytes = 0
 page.on('response', async (r) => {
   if (!r.url().includes('/dicomWeb/')) return
   const n = (await r.body().catch(() => Buffer.alloc(0))).length
   if (r.url().includes('/frames/')) { frames++; bytes += n } else metaBytes += n
 })
-let failed = 0
-const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
-const backendCheck = async (p) => gpu && check((await p.evaluate(() => nv.backend)) === 'webgpu', 'runs on WebGPU')
 for (const [STUDY, size] of SLIDES) {
 frames = 0; bytes = 0; metaBytes = 0; errors.length = 0
 const t = Date.now()
@@ -36,7 +31,7 @@ await page.screenshot({ path: `${process.env.SHOT ?? 'slide-shot'}-${STUDY.slice
 console.log(`open: ${open.frames} frames ${(open.bytes / 1e6).toFixed(2)} MB; after zoom: ${frames} frames ${(bytes / 1e6).toFixed(2)} MB; metadata ${(metaBytes / 1e6).toFixed(2)} MB`)
 check(frames > open.frames, 'zoom fetched more tiles')
 check(bytes < size / 8, `far less than the ${size / 1e6} MB series`)
-check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+noErrors()
 }
 // Multiplexed fluorescence (HTAN-OHSU, CC BY 4.0, JPEG 2000 lossless, series 2.1 GB): one slide per optical path; the picker switches channel.
 {
@@ -50,7 +45,7 @@ check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
   await page.waitForTimeout(4000)
   check(frames > before, `switching path fetches its tiles (${frames - before} frames)`)
   await page.screenshot({ path: `${process.env.SHOT ?? 'slide-shot'}-fluor.png` })
-  check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+  noErrors()
 }
 await browser.close()
-process.exit(failed ? 1 : 0)
+done()

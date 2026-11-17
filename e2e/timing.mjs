@@ -1,10 +1,10 @@
 // Cold vs warm (browser HTTP cache) stage timings for the anchor study, headed Chrome on the real GPU:
 // node e2e/timing.mjs [baseUrl]. Prints ms per stage; record results in review-log.md.
 import { chromium } from 'playwright'
+import { ANCHOR_STUDY as STUDY, GPU_ARGS } from './lib.mjs'
 
-const base = process.argv[2] ?? 'http://localhost:5299/'
-const STUDY = '1.2.840.113654.2.55.187766322555605983451267194286230980878'
-const context = await chromium.launchPersistentContext('', { headless: false, args: ['--use-angle=metal', '--enable-unsafe-webgpu'] })
+const base = process.argv[2] ?? 'http://localhost:5173/'
+const context = await chromium.launchPersistentContext('', { headless: false, args: GPU_ARGS })
 const page = await context.newPage()
 for (const run of ['cold', 'warm']) {
   const t0 = Date.now()

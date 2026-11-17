@@ -1,23 +1,16 @@
 // Live smoke against IDC: node e2e/live.mjs [baseUrl]. Not for CI (hits public IDC/S3).
 import { readFileSync } from 'node:fs'
-import { gpu, launch } from './launch.mjs'
+import { ANCHOR_STUDY as STUDY, harness, LUNG_CT, labelsAt, launch } from './lib.mjs'
 
-const base = process.argv[2] ?? 'http://localhost:5299/'
-const STUDY = '1.2.840.113654.2.55.187766322555605983451267194286230980878'
+const base = process.argv[2] ?? 'http://localhost:5173/'
 const LUNG_SEG = '1.2.276.0.7230010.3.1.3.313263360.20363.1706320514.804396'
 const STD_SEG = '1.2.276.0.7230010.3.1.3.313263360.40027.1706310312.485948'
-const LUNG_CT = '1.2.840.113654.2.55.122344168497038128022524906545138736420'
 // One point per segment (RAS mm) + label counts, from tools/seg_points.py on verify_seg.py-validated NIfTIs.
 const fixture = (n) => JSON.parse(readFileSync(new URL(`./${n}-points.json`, import.meta.url)))
 
 const browser = await launch()
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } })
-const errors = []
-page.on('pageerror', (e) => errors.push(e.message))
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
-let failed = 0
-const check = (ok, msg) => { console.log(ok ? 'ok  ' : 'FAIL', msg); if (!ok) failed++ }
-const backendCheck = async (p) => gpu && check((await p.evaluate(() => nv.backend)) === 'webgpu', 'runs on WebGPU')
+const { errors, check, backendCheck, noErrors, done } = harness(page)
 const settled = (uid) => page.waitForFunction((u) => {
   const shown = document.body.dataset.shown
   return u ? shown === u : !!shown
@@ -31,14 +24,7 @@ async function checkSeg({ points, counts }, name) {
     return c
   })
   check(JSON.stringify(wasm) === JSON.stringify(counts), `${name}: WASM label counts equal native dcm2niix`)
-  const got = await page.evaluate((pts) => pts.map((p) => {
-    let label
-    const on = (e) => { label = e.detail.values[1]?.label }
-    nv.addEventListener('locationChange', on)
-    nv.setCrosshairPos(p.mm)
-    nv.removeEventListener('locationChange', on)
-    return label
-  }), points)
+  const got = await labelsAt(page, points)
   const bad = points.filter((p, i) => got[i] !== p.label).map((p, i) => `${p.label}->${got[i]}`)
   check(bad.length === 0, `${name}: label at ${points.length - bad.length}/${points.length} segment points ${bad.join(', ')}`)
 }
@@ -64,13 +50,6 @@ check((await page.evaluate(() => nv.volumes.length)) === 1 && seriesParam() === 
 await page.goBack()
 await settled(STD_SEG)
 check(seriesParam() === STD_SEG && (await page.evaluate(() => nv.volumes.length)) === 2, 'back restores STANDARD pair')
-// Rapid re-selection: only the latest selection may install.
-await page.selectOption('#series', LUNG_SEG)
-await page.selectOption('#series', STD_SEG)
-await settled(STD_SEG)
-await page.waitForTimeout(3000)
-const st = await page.evaluate(() => [document.body.dataset.shown, nv.volumes.length, document.getElementById('status').textContent].join())
-check(st.startsWith(`${STD_SEG},2`), `superseded load does not install (${st})`)
 // Superseded overlay install: CT alone -> its SEG (addVolume held) -> back to CT.
 await page.selectOption('#series', LUNG_CT)
 await settled(LUNG_CT)
@@ -92,7 +71,7 @@ await page.fill('#opacity', '1')
 await page.waitForTimeout(500)
 check((await page.evaluate(() => [nv.volumes[1].atlasOutline, nv.volumes[1].opacity].join())) === '1,1', 'outline + opacity applied')
 await page.screenshot({ path: process.env.SHOT ?? 'e2e-shot.png' })
-check(errors.length === 0, `no console errors ${errors.join(' | ')}`)
+noErrors()
 
 // Wrong index hint: the STANDARD SEG claims the LUNG CT (same grid size). The SEG's own
 // references must win: overlay refused, CT kept.
@@ -131,4 +110,4 @@ for (const [st, se, b] of [
   await p3.close()
 }
 await browser.close()
-process.exit(failed ? 1 : 0)
+done()

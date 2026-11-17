@@ -32,4 +32,4 @@ Declined: dropping the post-install abort check entirely (needed: no await follo
 
 ## Verification
 
-`bun test src` (4 tests, 11 expects); mono niivue cmap tests 181 pass, nv-ext-tile 463 pass. Built app under `/idc/`: offline/live/slide headless + WebGPU and cinematic: 73 checks pass; WebKit run in review-log. Real Safari: both slides and anchor CT+SEG (WebGPU) render.
+`bun test src` (4 tests, 11 expects); mono niivue cmap tests 181 pass, nv-ext-tile 463 pass. Built app under `/idc/`: offline/live/slide headless + WebGPU and cinematic: 73 checks pass; WebKit 31 pass. Real Safari: both slides and anchor CT+SEG (WebGPU) render.

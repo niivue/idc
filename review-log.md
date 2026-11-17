@@ -51,4 +51,4 @@ Housekeeping: failed-GET retrieval case added. Not done (recorded for Chris): We
 
 ## Audit 2026-11-17
 
-See audit_response.md. Safari 27.2 (real, safaridriver): CPTAC JPEG slide was solid cyan → IDC proxy transcoded `type="image/jpeg"` requests to lossless JPEG (SOF3, 25 KB vs stored 4.3 KB baseline); nv-ext-tile de81ece0 requests the stored syntax; Safari renders both slides and the anchor CT+SEG (WebGPU, 74 segments). After all fixes, built app under `/idc/`: headless + WebGPU offline/live/slide + cinematic = 73 checks pass.
+See audit_response.md. Safari 27.2 (real, safaridriver): CPTAC JPEG slide was solid cyan → IDC proxy transcoded `type="image/jpeg"` requests to lossless JPEG (SOF3, 25 KB vs stored 4.3 KB baseline); nv-ext-tile de81ece0 requests the stored syntax; Safari renders both slides and the anchor CT+SEG (WebGPU, 74 segments). After all fixes, built app under `/idc/`: headless + WebGPU offline/live/slide + cinematic = 73 checks pass; WebKit offline/live/slide 31 pass.

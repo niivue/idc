@@ -309,9 +309,10 @@ seriesEl.onchange = () => {
 }
 window.onpopstate = () => show(readUrl().series)
 
+// Before any lookup, so a failed one still leaves a way to pick another study.
+seriesEl.replaceChildren(new Option('Choose an example…', ''), exampleGroup())
 try {
   if (!new URLSearchParams(location.search).has('StudyInstanceUIDs')) {
-    seriesEl.replaceChildren(new Option('Choose an example…', ''), exampleGroup())
     throw new Error('Choose an example or "Custom UID…" from the menu')
   }
   const req = readUrl()

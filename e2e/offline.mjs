@@ -52,5 +52,13 @@ await p2.goto(`${base}?StudyInstanceUIDs=${fx.study}`)
 await p2.waitForFunction(() => document.body.dataset.shown !== undefined && document.getElementById('status').classList.contains('error'), null, { timeout: 60000 })
 const partial = await p2.evaluate(() => [document.body.dataset.shown, nv.volumes.length, new URL(location).searchParams.get('SeriesInstanceUIDs'), document.getElementById('status').textContent].join('|'))
 check(partial.startsWith(`${fx.ct}|1|${fx.ct}|`) && partial.endsWith('Showing the image without its segmentation.'), `SEG failure keeps the image, says so (${partial.split('|')[3]})`)
+
+// A study IDC does not have: the menu still offers examples and Custom UID.
+const p3 = await browser.newPage()
+await p3.route('https://api.imaging.datacommons.cancer.gov/**', (r) => r.fulfill({ json: { rows: [], truncated: false } }))
+await p3.goto(`${base}?StudyInstanceUIDs=1.2.3`)
+await p3.waitForFunction(() => document.getElementById('status').classList.contains('error'), null, { timeout: 60000 })
+const menu = await p3.evaluate(() => [...document.querySelectorAll('#series option')].map((o) => o.value))
+check(menu.includes('custom') && menu.includes('ex:0'), `missing study keeps the menu (${menu.length} options)`)
 await browser.close()
 done()

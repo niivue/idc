@@ -44,3 +44,11 @@ Declined: dropping the post-install abort check entirely (needed: no await follo
 - **No findings: agreed.** The auditor's extra fixture (an implicit-VR cross-study SEG with an unrelated UID first, the CT second and a duplicate) passing through the shipped WASM confirms the array-membership consumer end to end.
 - **Reference-list capacity (256 bytes, at least three 64-char UIDs; extras warn and are omitted): accepted, documented.** Raising it enlarges every `TDICOMdata` (dcm2niix keeps one per input file), and no IDC SEG with more than one source series is known. Revisit if one appears.
 - **Development of this app is paused** in favour of IDC support in nv-ohif (see PLAN.md Status and `~/src/mono/scratch/plan-idc-ohif.md`).
+
+# Audit response — 0f81ec1 (2026-11-20)
+
+| # | Finding | Decision | Resolution |
+|---|---|---|---|
+| 1 | P2 failed study lookup leaves the Series menu empty | **Fixed** | `src/main.ts` installs the placeholder, examples and Custom UID before URL validation and lookup; success replaces them with This study + examples. `e2e/offline.mjs` adds a missing-study check (fails without the fix: 0 options; passes with it: 10). Build, 4 unit tests, 6/6 offline checks pass. |
+
+Re-audit 2026-11-20: no actionable findings (menu recovery confirmed, including a second Custom UID after a failed lookup).
